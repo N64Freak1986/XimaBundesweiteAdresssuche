@@ -581,16 +581,16 @@ Bei Fragen oder Problemen:
 
 ## 📌 Changelog
 
-### v11.0 (2024)
+### v11.0 (2025)
 - ✨ Straßenfeld (`openplz-street`) ist jetzt optional
 - 🔧 Unterstützung für 3-Felder-Formulare (Suche, PLZ, Ort)
 - 📝 Verbesserte Dokumentation
 
-### v10.0 (2024)
+### v10.0 (2025)
 - ✨ Automatische Straßennamen-Kürzung (LBDV-Kompatibilität)
 - 🔧 Konfigurierbare Kürzungsregeln
 
-### v9.0 (2024)
+### v9.0 (2025)
 - ✨ MutationObserver für dynamische Elemente
 - ✨ `reinitialize()` Funktion
 - ✨ Automatische Erkennung neuer Suchfelder
