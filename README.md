@@ -58,12 +58,66 @@ Bundesweite Adressvalidierung mit intelligenter Hybrid-Suche: **OpenPLZ** für D
 
 ## 🚀 Installation
 
-### 1. Datei einbinden
+### Standard-Installation
+
+#### 1. Datei einbinden
 
 ```html
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="hybrid-address-search.js"></script>
 ```
+
+### XIMA Formcycle Integration
+
+Für die Integration in **XIMA Formcycle**:
+
+#### 1. Datei hochladen
+
+1. Im XIMA Formcycle Backend zu **"Mandant" → "Mandantdateien"** navigieren
+2. `hybrid-address-search.js` hochladen
+3. Datei wird automatisch allen Formularen des Mandanten zur Verfügung gestellt
+
+#### 2. Script einbinden
+
+Im Formular unter **"Formulareigenschaften" → "Erweitert" → "Zusätzliches JavaScript"**:
+
+```javascript
+// jQuery ist in Formcycle bereits vorhanden
+// Script wird automatisch aus Mandantdateien geladen
+```
+
+Oder manuell in einem HTML-Element:
+
+```html
+<script src="${baseurl}/mandant/[MANDANT-ID]/files/hybrid-address-search.js"></script>
+```
+
+#### 3. Felder mit CSS-Klassen versehen
+
+In Formcycle die Input-Felder mit den entsprechenden Klassen ausstatten:
+
+- **Suchfeld**: `openplz-suche`
+- **PLZ-Feld**: `openplz-postalcode`
+- **Ort-Feld**: `openplz-locality`
+- **Straßenfeld** (optional): `openplz-street`
+
+**CSS-Klassen hinzufügen**: In den Feldeigenschaften unter "CSS-Klasse (class)"
+
+#### 4. Wiederholbare Container
+
+Das Script funktioniert automatisch mit **wiederholbaren Containern** in Formcycle!
+
+```
+📁 Adresse (wiederholt)
+  ├─ Suchfeld (openplz-suche)
+  ├─ Straße (openplz-street)
+  ├─ PLZ (openplz-postalcode)
+  └─ Ort (openplz-locality)
+```
+
+Der **MutationObserver** erkennt automatisch neue Container und initialisiert die Felder.
+
+**Weitere Informationen**: [XIMA Formcycle Mandantendateien](https://help8.formcycle.eu/de/support/solutions/articles/103000046891-mandantdateien)
 
 ### 2. Bayern API-Key konfigurieren
 
@@ -80,8 +134,24 @@ var CONFIG = {
 };
 ```
 
-**Bayern API-Key beantragen:**
-[https://geodatenonline.bayern.de/geodatenonline/](https://geodatenonline.bayern.de/geodatenonline/)
+#### Bayern API-Key beantragen (kostenlos!)
+
+Die Nutzung der Bayern Geoservices API ist **kostenlos**:
+
+1. **Website besuchen**: [https://geodatenonline.bayern.de/geodatenonline/](https://geodatenonline.bayern.de/geodatenonline/)
+2. **Registrierung**: Kostenlosen Account anlegen
+3. **API-Key anfordern**: Im Portal unter "Meine APIs" → "Neuen API-Key erstellen"
+4. **Freischaltung**: Key wird in der Regel innerhalb von 1-2 Werktagen freigeschaltet
+5. **E-Mail-Bestätigung**: API-Key wird per E-Mail zugesendet
+
+**Wichtig**: Bei der Anfrage angeben, dass der Key für die Ortssuchdienst-API benötigt wird.
+
+**Alternative ohne Bayern-API**: Wenn kein API-Key verfügbar ist, kann die Bayern-API deaktiviert werden:
+```javascript
+BAYERN_API: {
+  ENABLED: false  // Nur OpenPLZ nutzen
+}
+```
 
 ---
 
@@ -498,6 +568,20 @@ console.log('Hat Straßenfeld:', group.hasStrasseField);  // true/false
 - API-Key korrekt eingetragen?
 - PLZ im Bayern-Bereich? (80000-87999, 90000-97999)
 - Netzwerk-Tab prüfen (403 = Key falsch, 404 = keine Treffer)
+
+#### XIMA Formcycle spezifisch
+- **Mandantdatei nicht gefunden**: Pfad prüfen `${baseurl}/mandant/[MANDANT-ID]/files/hybrid-address-search.js`
+- **Felder werden nicht initialisiert**: Sicherstellen dass jQuery VOR dem Script geladen wird
+- **Wiederholbare Container**: MutationObserver sollte aktiviert sein (`CONFIG.OBSERVER.ENABLED = true`)
+- **Feldklassen nicht erkannt**: CSS-Klassen direkt in Feldeinstellungen eintragen (nicht im HTML)
+- **Script Fehler**: Browser-Konsole öffnen (F12) und nach JavaScript-Fehlern suchen
+
+**Formcycle Debug-Modus**:
+```javascript
+// Im Browser-Konsole ausführen:
+HybridAddressSearch.config.DEBUG = true;
+HybridAddressSearch.getFieldGroups();  // Zeigt alle erkannten Feldgruppen
+```
 
 ---
 

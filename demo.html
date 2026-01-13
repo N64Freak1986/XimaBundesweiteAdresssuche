@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hybrid Adresssuche - Demo</title>
+
+    <!-- jQuery -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+    <!-- Hybrid Address Search Script -->
+    <script src="hybrid-address-search.js"></script>
+
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 40px;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .header .version {
+            background: rgba(255,255,255,0.2);
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            margin-top: 10px;
+        }
+
+        .forms-wrapper {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+
+        @media (max-width: 968px) {
+            .forms-wrapper {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .form-card {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .form-card h2 {
+            color: #333;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .form-card h2 .badge {
+            background: #667eea;
+            color: white;
+            font-size: 0.7em;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-weight: normal;
+        }
+
+        .form-card p {
+            color: #666;
+            margin-bottom: 20px;
+            font-size: 0.95em;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 600;
+            font-size: 0.9em;
+        }
+
+        .form-group label .required {
+            color: #e74c3c;
+            margin-left: 3px;
+        }
+
+        .form-group label .optional {
+            color: #95a5a6;
+            font-weight: normal;
+            font-size: 0.85em;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 1em;
+            transition: all 0.3s ease;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .form-group input::placeholder {
+            color: #bbb;
+        }
+
+        .info-box {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            margin-bottom: 20px;
+        }
+
+        .info-box h3 {
+            color: #333;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .info-box ul {
+            list-style: none;
+            padding-left: 0;
+        }
+
+        .info-box li {
+            padding: 10px 0;
+            border-bottom: 1px solid #f0f0f0;
+            color: #555;
+        }
+
+        .info-box li:last-child {
+            border-bottom: none;
+        }
+
+        .info-box li strong {
+            color: #667eea;
+            display: inline-block;
+            min-width: 150px;
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .feature-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+        }
+
+        .feature-card .icon {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .feature-card h4 {
+            margin-bottom: 8px;
+            font-size: 1.1em;
+        }
+
+        .feature-card p {
+            color: rgba(255,255,255,0.9);
+            font-size: 0.9em;
+        }
+
+        .github-link {
+            text-align: center;
+            margin-top: 40px;
+        }
+
+        .github-link a {
+            display: inline-block;
+            background: white;
+            color: #667eea;
+            padding: 15px 30px;
+            border-radius: 25px;
+            text-decoration: none;
+            font-weight: 600;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            transition: transform 0.2s ease;
+        }
+
+        .github-link a:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+        }
+
+        .console-output {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            margin-top: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .console-output h3 {
+            color: #333;
+            margin-bottom: 15px;
+        }
+
+        .console-output pre {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 15px;
+            border-radius: 8px;
+            overflow-x: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85em;
+            line-height: 1.5;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .toggle-debug {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.9em;
+            margin-bottom: 15px;
+            transition: background 0.3s ease;
+        }
+
+        .toggle-debug:hover {
+            background: #5568d3;
+        }
+
+        .toggle-debug:active {
+            transform: scale(0.98);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>🏔️ Hybrid Adresssuche 🇩🇪</h1>
+            <p>Bayern Ortssuchdienst + OpenPLZ Integration</p>
+            <span class="version">Version 11.0</span>
+        </div>
+
+        <!-- Formulare -->
+        <div class="forms-wrapper">
+            <!-- 4-Felder-Formular -->
+            <div class="form-card">
+                <h2>
+                    4-Felder-Layout
+                    <span class="badge">Klassisch</span>
+                </h2>
+                <p>Formular mit separatem Straßenfeld (openplz-street)</p>
+
+                <form>
+                    <div class="form-group">
+                        <label>
+                            Adresssuche
+                            <span class="required">*</span>
+                        </label>
+                        <input type="text"
+                               class="openplz-suche"
+                               placeholder="z.B. Marienplatz 80331 oder Unter den Linden 10117"
+                               autocomplete="off">
+                    </div>
+
+                    <div class="form-group">
+                        <label>
+                            Straße + Hausnummer
+                            <span class="required">*</span>
+                        </label>
+                        <input type="text"
+                               class="openplz-street"
+                               placeholder="z.B. Marienplatz 1"
+                               autocomplete="off">
+                    </div>
+
+                    <div class="form-group">
+                        <label>
+                            PLZ
+                            <span class="required">*</span>
+                        </label>
+                        <input type="text"
+                               class="openplz-postalcode"
+                               placeholder="z.B. 80331"
+                               autocomplete="off">
+                    </div>
+
+                    <div class="form-group">
+                        <label>
+                            Ort
+                            <span class="required">*</span>
+                        </label>
+                        <input type="text"
+                               class="openplz-locality"
+                               placeholder="z.B. München"
+                               autocomplete="off">
+                    </div>
+                </form>
+            </div>
+
+            <!-- 3-Felder-Formular -->
+            <div class="form-card">
+                <h2>
+                    3-Felder-Layout
+                    <span class="badge">Neu in V11</span>
+                </h2>
+                <p>Formular ohne separates Straßenfeld (openplz-street optional)</p>
+
+                <form>
+                    <div class="form-group">
+                        <label>
+                            Adresssuche
+                            <span class="required">*</span>
+                        </label>
+                        <input type="text"
+                               class="openplz-suche"
+                               placeholder="z.B. 80331 oder Hauptstraße 10115"
+                               autocomplete="off">
+                    </div>
+
+                    <div class="form-group">
+                        <label>
+                            PLZ
+                            <span class="required">*</span>
+                        </label>
+                        <input type="text"
+                               class="openplz-postalcode"
+                               placeholder="z.B. 80331"
+                               autocomplete="off">
+                    </div>
+
+                    <div class="form-group">
+                        <label>
+                            Ort
+                            <span class="required">*</span>
+                        </label>
+                        <input type="text"
+                               class="openplz-locality"
+                               placeholder="z.B. München"
+                               autocomplete="off">
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Features -->
+        <div class="info-box">
+            <h3>🚀 Features</h3>
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="icon">🏔️</div>
+                    <h4>Bayern API</h4>
+                    <p>Validierung bis zur Hausnummer für Bayern (PLZ 80000-97999)</p>
+                </div>
+                <div class="feature-card">
+                    <div class="icon">🇩🇪</div>
+                    <h4>OpenPLZ API</h4>
+                    <p>Bundesweite Straßenverzeichnisse mit RegEx-Validierung</p>
+                </div>
+                <div class="feature-card">
+                    <div class="icon">🔄</div>
+                    <h4>MutationObserver</h4>
+                    <p>Automatische Erkennung dynamischer Formularfelder</p>
+                </div>
+                <div class="feature-card">
+                    <div class="icon">⚡</div>
+                    <h4>Smart Caching</h4>
+                    <p>Performance-Optimierung durch intelligentes Caching</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Anleitung -->
+        <div class="info-box">
+            <h3>📝 So funktioniert's</h3>
+            <ul>
+                <li>
+                    <strong>Bayern-Adressen</strong>
+                    Gib "Marienplatz 80331" ein → Autocomplete mit 🏔️ zeigt Ergebnisse bis Hausnummer
+                </li>
+                <li>
+                    <strong>Andere Regionen</strong>
+                    Gib "Unter den Linden 10117" ein → Autocomplete mit 🇩🇪 zeigt Straßen (Hausnummer manuell ergänzen)
+                </li>
+                <li>
+                    <strong>Nur PLZ</strong>
+                    Gib "80331" ein → Zeigt alle Straßen für diese PLZ
+                </li>
+                <li>
+                    <strong>Validierung</strong>
+                    OpenPLZ-Adressen erfordern Hausnummer (z.B. "Hauptstr. 42")
+                </li>
+                <li>
+                    <strong>Straßenkürzung</strong>
+                    Bayern-Adressen: "Herrenstraße" wird automatisch zu "Herrenstr." (LBDV-kompatibel)
+                </li>
+            </ul>
+        </div>
+
+        <!-- Debug Console -->
+        <div class="console-output">
+            <h3>🔍 Debug-Konsole</h3>
+            <button class="toggle-debug" onclick="toggleDebug()">Debug-Modus umschalten</button>
+            <pre id="console-log">Öffne die Browser-Konsole (F12) für detaillierte Logs...</pre>
+        </div>
+
+        <!-- GitHub Link -->
+        <div class="github-link">
+            <a href="https://github.com/N64Freak1986/XimaBundesweiteAdresssuche" target="_blank">
+                ⭐ Auf GitHub ansehen
+            </a>
+        </div>
+    </div>
+
+    <script>
+        // Debug-Modus Toggle
+        function toggleDebug() {
+            var currentDebug = HybridAddressSearch.config.DEBUG;
+            HybridAddressSearch.config.DEBUG = !currentDebug;
+
+            var btn = document.querySelector('.toggle-debug');
+            btn.textContent = HybridAddressSearch.config.DEBUG ?
+                '✓ Debug-Modus AN' :
+                '✗ Debug-Modus AUS';
+            btn.style.background = HybridAddressSearch.config.DEBUG ?
+                '#27ae60' :
+                '#667eea';
+
+            console.log('Debug-Modus:', HybridAddressSearch.config.DEBUG ? 'AKTIVIERT' : 'DEAKTIVIERT');
+        }
+
+        // Console Log Capturing (optional)
+        (function() {
+            var consoleLog = document.getElementById('console-log');
+            var logs = [];
+            var maxLogs = 20;
+
+            var originalLog = console.log;
+            console.log = function() {
+                // Original console.log aufrufen
+                originalLog.apply(console, arguments);
+
+                // Nur Hybrid Search Logs anzeigen
+                var message = Array.from(arguments).join(' ');
+                if (message.includes('[HybridSearch]')) {
+                    logs.push(message);
+                    if (logs.length > maxLogs) {
+                        logs.shift();
+                    }
+                    consoleLog.textContent = logs.join('\n');
+                    consoleLog.scrollTop = consoleLog.scrollHeight;
+                }
+            };
+        })();
+
+        // Willkommensnachricht
+        console.log('%c🏔️ Hybrid Adresssuche v11.0 geladen!', 'color: #667eea; font-size: 16px; font-weight: bold;');
+        console.log('%cTeste die Suche:', 'color: #667eea; font-weight: bold;');
+        console.log('  Bayern: "Marienplatz 80331"');
+        console.log('  Berlin: "Unter den Linden 10117"');
+        console.log('  Hamburg: "Reeperbahn 20359"');
+        console.log('  Nur PLZ: "80331"');
+        console.log('');
+        console.log('%cAPI-Funktionen:', 'color: #667eea; font-weight: bold;');
+        console.log('  HybridAddressSearch.getFieldGroups()');
+        console.log('  HybridAddressSearch.isBayernPLZ("80331")');
+        console.log('  HybridAddressSearch.analyzeInput("Marienplatz 80331")');
+        console.log('  HybridAddressSearch.reinitialize()');
+    </script>
+</body>
+</html>
