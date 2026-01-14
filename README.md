@@ -13,7 +13,7 @@ Bundesweite Adressvalidierung mit intelligenter Hybrid-Suche: **OpenPLZ** für D
 - Abwärtskompatibel mit Formularen, die 4 Felder nutzen
 
 ### 🆕 Frühere Versionen
-- **V10**: Automatische Kürzung von "Straße" zu "Str." (LBDV-Kompatibilität für Bayern)
+- **V10**: Automatische Kürzung von "Straße" zu "Str." (LDBV-Kompatibilität für Bayern)
 - **V9**: MutationObserver für dynamisch hinzugefügte Elemente (wiederholbare Container)
 - **V9**: Automatische Erkennung neuer Suchfelder im DOM
 - **V9**: `reinitialize()` Funktion für manuelle Neuinitialisierung
@@ -261,7 +261,7 @@ BAYERN_PLZ_RANGES: [
 ]
 ```
 
-### Straßennamen-Kürzung (LBDV)
+### Straßennamen-Kürzung (LDBV)
 
 ```javascript
 STREET_ABBREVIATION: {
