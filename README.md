@@ -690,11 +690,14 @@ Bei Fragen oder Problemen:
 
 ## 🎯 Roadmap
 
-- [ ] TypeScript-Version
+- [x] **TypeScript-Version** ✅ (siehe `EXPERIMENTAL-FEATURES.md`)
+- [x] **Nominatim API-Integration** ✅ (siehe `EXPERIMENTAL-FEATURES.md`)
+- [x] **Erweiterte Validierung** ✅ (siehe `EXPERIMENTAL-FEATURES.md`)
 - [ ] React/Vue/Angular-Komponenten
-- [ ] Weitere API-Quellen (z.B. Nominatim)
-- [ ] Erweiterte Validierung (Straßenexistenz)
 - [ ] Offline-Modus mit IndexedDB
+- [ ] Automatische Tests (Unit/Integration)
+
+**Experimentelle Features verfügbar!** Siehe [EXPERIMENTAL-FEATURES.md](EXPERIMENTAL-FEATURES.md) für Details.
 
 ---
 

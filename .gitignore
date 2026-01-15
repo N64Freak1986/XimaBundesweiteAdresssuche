@@ -19,12 +19,22 @@ yarn-error.log*
 *.tmp
 *.temp
 
-# Node modules (falls später benötigt)
+# Node modules
 node_modules/
+package-lock.json
+yarn.lock
 
-# Build files (falls später benötigt)
+# Build files
 dist/
 build/
+*.js.map
+*.d.ts.map
+
+# TypeScript compiled output
+hybrid-address-search-compiled.js
+hybrid-address-search-compiled.js.map
+*.d.ts
+!hybrid-address-search.d.ts
 
 # Environment files
 .env
@@ -34,3 +44,7 @@ build/
 # API Keys (Sicherheit)
 **/config/api-keys.js
 **/api-keys.json
+
+# Test coverage
+coverage/
+.nyc_output/

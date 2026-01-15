@@ -1,0 +1,38 @@
+{
+  "name": "xima-bundesweite-adresssuche",
+  "version": "11.1.0",
+  "description": "Hybrid-Adresssuche mit Bayern Ortssuchdienst, OpenPLZ und Nominatim OSM API",
+  "main": "hybrid-address-search.js",
+  "types": "hybrid-address-search.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "build:watch": "tsc --watch",
+    "test": "echo \"Tests siehe test-validation.html\" && exit 0"
+  },
+  "keywords": [
+    "address",
+    "validation",
+    "germany",
+    "bayern",
+    "openplz",
+    "nominatim",
+    "geocoding",
+    "formcycle",
+    "xima"
+  ],
+  "author": "XIMA",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/jquery": "^3.5.29",
+    "typescript": "^5.3.3"
+  },
+  "dependencies": {},
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/N64Freak1986/XimaBundesweiteAdresssuche.git"
+  },
+  "bugs": {
+    "url": "https://github.com/N64Freak1986/XimaBundesweiteAdresssuche/issues"
+  },
+  "homepage": "https://github.com/N64Freak1986/XimaBundesweiteAdresssuche#readme"
+}
