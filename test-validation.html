@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test: Erweiterte Adress-Validierung</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="address-validation-extended.js"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 40px;
+        }
+
+        .header h1 {
+            font-size: 2em;
+            margin-bottom: 10px;
+        }
+
+        .test-card {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .test-card h2 {
+            color: #333;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+
+        .test-input {
+            margin-bottom: 20px;
+        }
+
+        .test-input label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .test-input input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 1em;
+        }
+
+        .test-input input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1em;
+            font-weight: 600;
+            transition: background 0.3s;
+        }
+
+        button:hover {
+            background: #5568d3;
+        }
+
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+
+        .result.valid {
+            background: #d4edda;
+            border: 2px solid #28a745;
+            color: #155724;
+        }
+
+        .result.invalid {
+            background: #f8d7da;
+            border: 2px solid #dc3545;
+            color: #721c24;
+        }
+
+        .result.info {
+            background: #d1ecf1;
+            border: 2px solid #17a2b8;
+            color: #0c5460;
+        }
+
+        .test-examples {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .test-examples h3 {
+            color: #667eea;
+            margin-bottom: 10px;
+            font-size: 0.9em;
+        }
+
+        .test-examples code {
+            background: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            margin: 2px;
+            display: inline-block;
+            font-size: 0.85em;
+        }
+
+        .auto-tests {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 20px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            line-height: 1.6;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🧪 Test: Erweiterte Adress-Validierung</h1>
+            <p>Teste die neuen Validierungs-Features</p>
+        </div>
+
+        <!-- Test 1: Straßen-Parsing -->
+        <div class="test-card">
+            <h2>1. Straßen-Adresse parsen</h2>
+
+            <div class="test-examples">
+                <h3>Beispiele zum Testen:</h3>
+                <code>Hauptstraße 12</code>
+                <code>Am Plan 3c</code>
+                <code>Berliner Str. 45-47</code>
+                <code>Gartenweg 8/3</code>
+                <code>Postfach 1234</code>
+                <code>Hauptstraße</code> (ungültig)
+            </div>
+
+            <div class="test-input">
+                <label>Straßenadresse:</label>
+                <input type="text" id="street-input" placeholder="z.B. Hauptstraße 12">
+            </div>
+
+            <button onclick="testStreetParsing()">Adresse parsen</button>
+
+            <div id="street-result"></div>
+        </div>
+
+        <!-- Test 2: Hausnummer-Validierung -->
+        <div class="test-card">
+            <h2>2. Hausnummer validieren</h2>
+
+            <div class="test-examples">
+                <h3>Beispiele zum Testen:</h3>
+                <code>12</code>
+                <code>12a</code>
+                <code>12-14</code> (Bereich)
+                <code>12/2</code> (Wohnung)
+                <code>abc</code> (ungültig)
+            </div>
+
+            <div class="test-input">
+                <label>Hausnummer:</label>
+                <input type="text" id="housenumber-input" placeholder="z.B. 12a">
+            </div>
+
+            <button onclick="testHouseNumber()">Hausnummer validieren</button>
+
+            <div id="housenumber-result"></div>
+        </div>
+
+        <!-- Test 3: PLZ-Validierung -->
+        <div class="test-card">
+            <h2>3. PLZ validieren</h2>
+
+            <div class="test-examples">
+                <h3>Beispiele zum Testen:</h3>
+                <code>80331</code> (gültig)
+                <code>12345</code> (gültig)
+                <code>1234</code> (ungültig)
+                <code>123456</code> (ungültig)
+            </div>
+
+            <div class="test-input">
+                <label>Postleitzahl:</label>
+                <input type="text" id="plz-input" placeholder="z.B. 80331">
+            </div>
+
+            <button onclick="testPostalCode()">PLZ validieren</button>
+
+            <div id="plz-result"></div>
+        </div>
+
+        <!-- Test 4: Vollständige Adresse -->
+        <div class="test-card">
+            <h2>4. Vollständige Adresse validieren</h2>
+
+            <div class="test-examples">
+                <h3>Beispiele zum Testen:</h3>
+                <code>Hauptstr. 12, 80331 München</code>
+                <code>Unter den Linden 1, 10117 Berlin</code>
+            </div>
+
+            <div class="test-input">
+                <label>Vollständige Adresse:</label>
+                <input type="text" id="full-input" placeholder="z.B. Hauptstr. 12, 80331 München">
+            </div>
+
+            <button onclick="testFullAddress()">Adresse validieren</button>
+
+            <div id="full-result"></div>
+        </div>
+
+        <!-- Test 5: Format-Korrektur -->
+        <div class="test-card">
+            <h2>5. Format-Korrektur testen</h2>
+
+            <div class="test-examples">
+                <h3>Beispiele zum Testen:</h3>
+                <code>haupt str 12</code>
+                <code>berliner   strasse  45</code>
+                <code>marienplatz,,80331</code>
+            </div>
+
+            <div class="test-input">
+                <label>Zu korrigierende Adresse:</label>
+                <input type="text" id="correct-input" placeholder="z.B. haupt str 12">
+            </div>
+
+            <button onclick="testCorrection()">Korrigieren</button>
+
+            <div id="correct-result"></div>
+        </div>
+
+        <!-- Automatische Tests -->
+        <div class="test-card">
+            <h2>6. Automatische Tests ausführen</h2>
+            <button onclick="runAutoTests()">Alle Tests ausführen</button>
+            <div id="auto-tests" class="auto-tests" style="margin-top: 20px; display: none;"></div>
+        </div>
+    </div>
+
+    <script>
+        function displayResult(elementId, result, isValid) {
+            var $result = $('<div class="result"></div>');
+            $result.addClass(isValid === true ? 'valid' : (isValid === false ? 'invalid' : 'info'));
+            $result.text(JSON.stringify(result, null, 2));
+            $('#' + elementId).html($result);
+        }
+
+        function testStreetParsing() {
+            var street = $('#street-input').val();
+            var result = AddressValidationExtended.parseStreetAddress(street);
+            displayResult('street-result', result, result.valid);
+        }
+
+        function testHouseNumber() {
+            var houseNumber = $('#housenumber-input').val();
+            var result = AddressValidationExtended.validateHouseNumber(houseNumber);
+            displayResult('housenumber-result', result, result.valid);
+        }
+
+        function testPostalCode() {
+            var plz = $('#plz-input').val();
+            var result = AddressValidationExtended.validatePostalCode(plz);
+            displayResult('plz-result', result, result.valid);
+        }
+
+        function testFullAddress() {
+            var full = $('#full-input').val();
+            var result = AddressValidationExtended.validateFullAddress(full);
+            displayResult('full-result', result, result.valid);
+        }
+
+        function testCorrection() {
+            var text = $('#correct-input').val();
+            var corrected = AddressValidationExtended.correctCommonMistakes(text);
+            var normalized = AddressValidationExtended.normalizeAddress(corrected);
+
+            var result = {
+                original: text,
+                corrected: corrected,
+                normalized: normalized,
+                changed: text !== normalized
+            };
+
+            displayResult('correct-result', result, null);
+        }
+
+        function runAutoTests() {
+            $('#auto-tests').show();
+            var $output = $('#auto-tests');
+            $output.html('');
+
+            var originalLog = console.log;
+            console.log = function() {
+                var message = Array.from(arguments).join(' ');
+                $output.append(message + '\n');
+                originalLog.apply(console, arguments);
+            };
+
+            AddressValidationExtended.runTests();
+
+            console.log = originalLog;
+        }
+
+        // Willkommensnachricht
+        console.log('%c🧪 Erweiterte Adress-Validierung geladen!', 'color: #667eea; font-size: 16px; font-weight: bold;');
+        console.log('API verfügbar unter: AddressValidationExtended');
+    </script>
+</body>
+</html>
