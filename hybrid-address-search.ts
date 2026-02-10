@@ -36,7 +36,7 @@ interface PLZRange {
 
 interface StreetAbbreviationRule {
   pattern: RegExp;
-  replacement: string;
+  replacement: string | ((match: string, ...args: any[]) => string);
 }
 
 interface StreetAbbreviationConfig {
@@ -184,8 +184,11 @@ interface HybridAddressSearchAPI {
       APPLY_TO_BAYERN: true,
       APPLY_TO_OPENPLZ: false,
       RULES: [
-        { pattern: /straße(\s|$)/gi, replacement: 'str.$1' },
-        { pattern: /Straße(\s|$)/g, replacement: 'Str.$1' },
+        {
+          pattern: /[Ss]traße(\s|$)/g,
+          replacement: (match: string, p1: string): string =>
+            match[0] === 'S' ? 'Str.' + p1 : 'str.' + p1
+        },
         { pattern: /STRASSE(\s|$)/g, replacement: 'STR.$1' }
       ]
     },

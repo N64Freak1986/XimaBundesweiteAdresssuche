@@ -57,8 +57,15 @@
       APPLY_TO_BAYERN: true,   // Nur bei Bayern-Adressen anwenden
       APPLY_TO_OPENPLZ: false, // Bei OpenPLZ-Adressen anwenden
       RULES: [
-        { pattern: /straße(\s|$)/gi, replacement: 'str.$1' },
-        { pattern: /Straße(\s|$)/g, replacement: 'Str.$1' },
+        {
+          // Erhält die originale Großschreibung des "S":
+          // "Straße" (S groß)  → "Str."  z.B. Thomas-Dachser-Straße → Thomas-Dachser-Str.
+          // "straße" (s klein) → "str."  z.B. Wilhelmstraße          → Wilhelmstr.
+          pattern: /[Ss]traße(\s|$)/g,
+          replacement: function(match, p1) {
+            return match[0] === 'S' ? 'Str.' + p1 : 'str.' + p1;
+          }
+        },
         { pattern: /STRASSE(\s|$)/g, replacement: 'STR.$1' }
       ]
     },
