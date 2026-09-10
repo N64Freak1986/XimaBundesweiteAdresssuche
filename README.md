@@ -12,6 +12,9 @@ Bundesweite Adressvalidierung mit intelligenter Hybrid-Suche: **OpenPLZ** für D
 - Unterstützt Formulare mit nur 3 Feldern (Suche, PLZ, Ort)
 - Abwärtskompatibel mit Formularen, die 4 Felder nutzen
 
+### Demo
+- Die Demo ist gegenwärtig unter https://formulare.kempten.de/frontend-server/form/alias/1/form_14352 ereichbar.
+
 ### 🆕 Frühere Versionen
 - **V10**: Automatische Kürzung von "Straße" zu "Str." (LDBV-Kompatibilität für Bayern)
 - **V9**: MutationObserver für dynamisch hinzugefügte Elemente (wiederholbare Container)
