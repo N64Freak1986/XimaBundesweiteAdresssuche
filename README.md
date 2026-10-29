@@ -20,7 +20,6 @@ Seit Version 1.0.0 ist die Adresssuche ein formcycle-Plugin. Das frühere Skript
 2. In den Plugin-Einstellungen den **Bayern API-Key** eintragen (Feld wird maskiert gespeichert).
 3. In jedem Formular, das die Adresssuche nutzt, unter *Dateien/Ressourcen* die alte JS-Datei (bzw. den eingefügten Skript-Code) **entfernen** und die Plugin-Ressource **`hybrid-address-search.js`** einbinden.
 4. Formulare speichern. Feldklassen und Container-Klassen bleiben unverändert, es ist keine weitere Anpassung nötig.
-5. Den bisher veröffentlichten API-Key beim Ortssuchdienst Bayern **sperren und neu ausstellen** lassen und nur den neuen Key im Plugin hinterlegen. Der alte Key war über die Formularseiten öffentlich abrufbar.
 
 Ist die alte Datei noch im Formular, startet die Plugin-Version nicht zusätzlich und meldet in der Browser-Konsole, dass das alte Skript entfernt werden muss.
 
