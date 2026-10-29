@@ -1,50 +1,22 @@
+# Build
+target/
+*.jar
+!dist/*.jar
+!releases/**/*.jar
+
 # IDE
-.vscode/
 .idea/
-*.swp
-*.swo
-*~
+*.iml
+.vscode/
+.settings/
+.classpath
+.project
+.claude/
 
 # OS
 .DS_Store
 Thumbs.db
 
-# Logs
+# Logs / temporaere Dateien
 *.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# Temporary files
 *.tmp
-*.temp
-
-# Node modules
-node_modules/
-package-lock.json
-yarn.lock
-
-# Build files
-dist/
-build/
-*.js.map
-*.d.ts.map
-
-# TypeScript compiled output
-hybrid-address-search-compiled.js
-hybrid-address-search-compiled.js.map
-*.d.ts
-!hybrid-address-search.d.ts
-
-# Environment files
-.env
-.env.local
-.env.*.local
-
-# API Keys (Sicherheit)
-**/config/api-keys.js
-**/api-keys.json
-
-# Test coverage
-coverage/
-.nyc_output/

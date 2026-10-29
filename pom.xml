@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>de.hybridadresssuche.fc</groupId>
+    <artifactId>fc-plugin-adresssuche</artifactId>
+    <version>1.0.1</version>
+    <packaging>jar</packaging>
+
+    <name>Hybride Adresssuche (Bayern Ortssuchdienst + OpenPLZ)</name>
+    <description>formcycle-Plugin: Adress-Autovervollständigung mit Bayern Ortssuchdienst (API-Key nur serverseitig) und OpenPLZ, inkl. Ortsbeschränkung per CSS-Klasse.</description>
+
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+        <xfc.version>8.5.5</xfc.version>
+        <xfc.version.requirement>8.5.0</xfc.version.requirement>
+        <!-- Elementschluessel der ersten Store-Version: NIE aendern -->
+        <plugin.key>1ea33546-3a84-4c89-a531-e0b657475bde</plugin.key>
+        <plugin.repository>xfc-proma</plugin.repository>
+        <java.version>11</java.version>
+        <maven.compiler.source>11</maven.compiler.source>
+        <maven.compiler.target>11</maven.compiler.target>
+        <maven.compiler.release>11</maven.compiler.release>
+        <junit.version>5.10.2</junit.version>
+    </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>de.xima.fc</groupId>
+                <artifactId>fc</artifactId>
+                <version>${xfc.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <dependencies>
+        <!-- formcycle APIs (zur Laufzeit von formcycle bereitgestellt) -->
+        <dependency>
+            <groupId>de.xima.fc</groupId>
+            <artifactId>fc-plugin-common</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>de.xima.fc</groupId>
+            <artifactId>fc-plugin-types</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>de.xima.fc</groupId>
+            <artifactId>fc-common</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>de.xima.fc</groupId>
+            <artifactId>fc-form-common</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- Bibliotheken aus der formcycle-WAR -->
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-lang3</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.alibaba</groupId>
+            <artifactId>fastjson</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>${junit.version}</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <finalName>${project.artifactId}</finalName>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.11.0</version>
+                <configuration>
+                    <release>11</release>
+                    <encoding>UTF-8</encoding>
+                    <showWarnings>true</showWarnings>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>3.1.2</version>
+            </plugin>
+            <!-- Fat-JAR mit formcycle-Manifest -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-assembly-plugin</artifactId>
+                <version>3.6.0</version>
+                <executions>
+                    <execution>
+                        <id>fat-jar</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>single</goal>
+                        </goals>
+                        <configuration>
+                            <finalName>${project.artifactId}-${project.version}</finalName>
+                            <appendAssemblyId>false</appendAssemblyId>
+                            <descriptorRefs>
+                                <descriptorRef>jar-with-dependencies</descriptorRef>
+                            </descriptorRefs>
+                            <archive>
+                                <manifest>
+                                    <addDefaultImplementationEntries>true</addDefaultImplementationEntries>
+                                </manifest>
+                                <manifestEntries>
+                                    <formcycle-version-requirement>${xfc.version.requirement}</formcycle-version-requirement>
+                                    <Plugin-Key>${plugin.key}</Plugin-Key>
+                                    <Plugin-Repository>${plugin.repository}</Plugin-Repository>
+                                    <Build-Timestamp>${maven.build.timestamp}</Build-Timestamp>
+                                    <Implementation-Title>${project.groupId}:${project.artifactId}</Implementation-Title>
+                                    <Implementation-Vendor-Id>${project.groupId}</Implementation-Vendor-Id>
+                                    <Implementation-Version>${project.version}</Implementation-Version>
+                                </manifestEntries>
+                            </archive>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>

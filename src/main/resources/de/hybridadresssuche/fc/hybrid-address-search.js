@@ -1,22 +1,31 @@
 /**
- * Hybrid Adresssuche - Bayern Ortssuchdienst + OpenPLZ Integration (V11)
+ * Hybrid Adresssuche - Bayern Ortssuchdienst + OpenPLZ (formcycle-Plugin)
  *
- * NEU in V11:
- * - openplz-street Klasse ist jetzt optional (Formulare ohne separates Straßenfeld)
+ * Nachfolger von hybrid-address-search.js V12. Feldklassen, Ortsbeschränkung per CSS-Klasse und
+ * window.HybridAddressSearch bleiben unverändert, damit bestehende Formulare ohne Anpassung weiterlaufen.
  *
- * NEU in V10:
- * - Automatische Kürzung von "Straße" zu "Str." bei Bayern-Adressen (LBDV-Kompatibilität)
+ * Unterschiede zu V12:
+ * - Kein API-Key im Browser: Die Bayern-Suche läuft über das Plugin-Servlet (plugin?name=hybridAdresssuche).
+ * - Ortsbeschränkungen und Debug-Modus kommen aus den Plugin-Einstellungen (PreRender-Metadaten).
+ * - Trefferliste wird als Text statt als HTML eingefügt.
  *
- * NEU in V9:
- * - MutationObserver für dynamisch hinzugefügte Elemente (wiederholbare Container)
- * - reinitialize() Funktion für manuelle Neuinitialisierung
- * - Automatische Erkennung neuer Suchfelder im DOM
- *
- * Version: 11.0 - Optionales Straßenfeld (openplz-street)
+ * ES5, benötigt jQuery (von formcycle bereitgestellt).
  */
-
 (function() {
   'use strict';
+
+  var PLUGIN_VERSION = '1.0.1';
+  var META_KEY = 'hybridAdresssuche';
+  var SERVLET_NAME = 'hybridAdresssuche';
+
+  // Bereits geladen (z. B. Ressource doppelt eingebunden) oder alte Version mit API-Key noch im Formular
+  if (window.HybridAddressSearch) {
+    if (!window.HybridAddressSearch.pluginVersion && window.console) {
+      console.warn('[HybridSearch] Eine ältere hybrid-address-search.js ist noch im Formular eingebunden. ' +
+        'Bitte entfernen (enthält den API-Key) – die Plugin-Version wird nicht zusätzlich gestartet.');
+    }
+    return;
+  }
 
   // ============================================================================
   // KONFIGURATION
@@ -24,8 +33,6 @@
 
   var CONFIG = {
     BAYERN_API: {
-      BASE_URL: 'https://geoservices.bayern.de/services/ortssuche/v1',
-      API_KEY: 'Hier API Key einfügen',
       ENABLED: true
     },
 
@@ -41,6 +48,17 @@
       strasse: 'openplz-street'
     },
 
+    // Ortsbeschränkungen: Schlüssel = CSS-Klasse am Suchfeld oder umgebenden Container.
+    // Wird durch die Plugin-Einstellung "Ortsbeschränkungen" ersetzt, sobald die PreRender-Daten vorliegen.
+    RESTRICTIONS: {
+      'openplz-kempten': {
+        name: 'Kempten (Allgäu)',
+        searchSuffix: 'Kempten',
+        postalCodes: ['87435', '87437', '87439'],
+        hint: 'Es sind nur Adressen in Kempten (Allgäu) möglich (PLZ 87435, 87437, 87439).'
+      }
+    },
+
     BAYERN_PLZ_RANGES: [
       { min: 80000, max: 87999 },
       { min: 90000, max: 97999 }
@@ -53,14 +71,12 @@
 
     // Straßennamen-Kürzung (LBDV-Kompatibilität)
     STREET_ABBREVIATION: {
-      ENABLED: true,           // Kürzung aktivieren/deaktivieren
-      APPLY_TO_BAYERN: true,   // Nur bei Bayern-Adressen anwenden
-      APPLY_TO_OPENPLZ: false, // Bei OpenPLZ-Adressen anwenden
+      ENABLED: true,
+      APPLY_TO_BAYERN: true,
+      APPLY_TO_OPENPLZ: false,
       RULES: [
         {
-          // Erhält die originale Großschreibung des "S":
-          // "Straße" (S groß)  → "Str."  z.B. Thomas-Dachser-Straße → Thomas-Dachser-Str.
-          // "straße" (s klein) → "str."  z.B. Wilhelmstraße          → Wilhelmstr.
+          // "Straße" → "Str." und "straße" → "str." (Großschreibung bleibt erhalten)
           pattern: /[Ss]traße(\s|$)/g,
           replacement: function(match, p1) {
             return match[0] === 'S' ? 'Str.' + p1 : 'str.' + p1;
@@ -75,25 +91,25 @@
     PAGE_SIZE: 50,
     MAX_PAGES: 20,
 
-    // MutationObserver Einstellungen
     OBSERVER: {
       ENABLED: true,
-      DEBOUNCE_DELAY: 100  // Verzögerung bevor neue Elemente initialisiert werden
+      DEBOUNCE_DELAY: 100
     },
 
-    DEBUG: true
+    DEBUG: false
   };
 
   // ============================================================================
   // GLOBALE VARIABLEN
   // ============================================================================
 
-  var debounceTimer = null;
   var observerDebounceTimer = null;
   var streetCache = {};
-  var localityCache = {};
   var fieldGroups = [];
   var mutationObserver = null;
+  var pluginMeta = null;
+  var servletUrls = null;
+  var workingServletUrl = null;
 
   // ============================================================================
   // HILFSFUNKTIONEN
@@ -101,7 +117,8 @@
 
   function log(message, data, level) {
     level = level || 'info';
-    if (!CONFIG.DEBUG && level === 'debug') return;
+    if (!CONFIG.DEBUG && level !== 'warn' && level !== 'error') return;
+    if (!window.console) return;
 
     var prefix = {
       'info': '✓',
@@ -112,6 +129,83 @@
     }[level] || '•';
 
     console.log(prefix + ' [HybridSearch] ' + message, data || '');
+  }
+
+  // ----------------------------------------------------------------------------
+  // Plugin-Konfiguration (PreRender) und Servlet-URL
+  // ----------------------------------------------------------------------------
+
+  /** Sucht hybridAdresssuche in XFC_METADATA.pluginResults.<Plugin> (oder direkt in XFC_METADATA). */
+  function findPluginMeta() {
+    var meta = window.XFC_METADATA;
+    if (!meta) return null;
+    if (meta[META_KEY]) return meta[META_KEY];
+    var results = meta.pluginResults;
+    if (results) {
+      if (results[META_KEY]) return results[META_KEY];
+      for (var key in results) {
+        if (results.hasOwnProperty(key) && results[key] && results[key][META_KEY]) {
+          return results[key][META_KEY];
+        }
+      }
+    }
+    return null;
+  }
+
+  function applyPluginConfig() {
+    pluginMeta = findPluginMeta();
+    if (!pluginMeta) {
+      log('Keine Plugin-Metadaten gefunden – Standardwerte (Kempten-Beschränkung) aktiv', null, 'debug');
+      return;
+    }
+    if (pluginMeta.restrictions && typeof pluginMeta.restrictions === 'object') {
+      CONFIG.RESTRICTIONS = pluginMeta.restrictions;
+    }
+    if (pluginMeta.bayernEnabled === false) {
+      CONFIG.BAYERN_API.ENABLED = false;
+      log('Kein Bayern API-Key im Plugin hinterlegt – nur OpenPLZ aktiv', null, 'warn');
+    }
+    CONFIG.DEBUG = pluginMeta.debug === true;
+  }
+
+  /** Mandanten-ID für /plugin?name=... (ohne sie liefert formcycle bei Mandanten-Plugins HTTP 404). */
+  function resolveClientId() {
+    if (pluginMeta && pluginMeta.clientId) return String(pluginMeta.clientId);
+    var meta = window.XFC_METADATA || {};
+    if (meta.client && meta.client.id) return String(meta.client.id);
+    if (meta.clientId) return String(meta.clientId);
+    var nodes = document.querySelectorAll("script[src*='mid='], link[href*='mid=']");
+    for (var i = 0; i < nodes.length; i++) {
+      var src = nodes[i].getAttribute('src') || nodes[i].getAttribute('href') || '';
+      var m = /[?&]mid=(\d+)/.exec(src);
+      if (m) return m[1];
+    }
+    return null;
+  }
+
+  function withClientId(url) {
+    if (!url || /[?&](client-id|mandantName)=/.test(url)) return url;
+    var cid = resolveClientId();
+    return cid ? url + (url.indexOf('?') >= 0 ? '&' : '?') + 'client-id=' + encodeURIComponent(cid) : url;
+  }
+
+  /** Mögliche Servlet-URLs in absteigender Priorität (Master-Server, Frontend-Server, relativ). */
+  function getServletUrls() {
+    if (servletUrls) return servletUrls;
+    var urls = [];
+    function add(u) {
+      u = withClientId(u);
+      if (u && urls.indexOf(u) === -1) urls.push(u);
+    }
+    if (pluginMeta && pluginMeta.servletUrl) add(pluginMeta.servletUrl);
+    var metaBase = window.XFC_METADATA && window.XFC_METADATA.urls && window.XFC_METADATA.urls.plugin;
+    if (metaBase) add(metaBase + (metaBase.indexOf('?') >= 0 ? '&' : '?') + 'name=' + SERVLET_NAME);
+    var path = window.location.pathname || '';
+    var idx = path.indexOf('/form/');
+    if (idx >= 0) add(path.substring(0, idx) + '/plugin?name=' + SERVLET_NAME);
+    add('plugin?name=' + SERVLET_NAME);
+    servletUrls = urls;
+    return urls;
   }
 
   function isBayernPLZ(plz) {
@@ -136,6 +230,38 @@
     return CONFIG.VALIDATION.STREET_WITH_NUMBER_REGEX.test(streetInput.trim());
   }
 
+  // ----------------------------------------------------------------------------
+  // Ortsbeschränkung
+  // ----------------------------------------------------------------------------
+
+  /**
+   * Ermittelt, ob das Suchfeld (oder ein umgebender Container) eine
+   * Beschränkungsklasse trägt. closest() prüft auch das Element selbst.
+   */
+  function detectRestriction($suchField) {
+    for (var cls in CONFIG.RESTRICTIONS) {
+      if (CONFIG.RESTRICTIONS.hasOwnProperty(cls) && $suchField.closest('.' + cls).length > 0) {
+        var restriction = CONFIG.RESTRICTIONS[cls];
+        restriction.cssClass = cls;
+        log('Ortsbeschränkung erkannt: ' + cls + ' (' + restriction.name + ')', null, 'debug');
+        return restriction;
+      }
+    }
+    return null;
+  }
+
+  function isAllowedPLZ(plz, restriction) {
+    if (!restriction) return true;
+    return restriction.postalCodes.indexOf(String(plz).trim()) !== -1;
+  }
+
+  function filterByRestriction(results, restriction) {
+    if (!restriction) return results;
+    return results.filter(function(item) {
+      return item && isAllowedPLZ(item.plz, restriction);
+    });
+  }
+
   /**
    * Kürzt Straßennamen gemäß LBDV-Konvention
    * z.B. "Herrenstraße 7" -> "Herrenstr. 7"
@@ -144,8 +270,6 @@
     if (!CONFIG.STREET_ABBREVIATION.ENABLED) {
       return streetName;
     }
-
-    // Prüfe ob Kürzung für diese Quelle aktiviert ist
     if (source === 'bayern' && !CONFIG.STREET_ABBREVIATION.APPLY_TO_BAYERN) {
       return streetName;
     }
@@ -166,18 +290,12 @@
   }
 
   function parseLabel(label) {
-    var plainText = label.replace(/<[^>]+>/g, '');
-    var boldMatches = label.match(/<b>([^<]+)<\/b>/g);
-    var boldTexts = boldMatches ? boldMatches.map(function(m) {
-      return m.replace(/<\/?b>/g, '');
-    }) : [];
+    var plainText = String(label || '').replace(/<[^>]+>/g, '');
     var plzMatch = plainText.match(/\b(\d{5})\b/);
-    var plz = plzMatch ? plzMatch[1] : '';
 
     return {
       plainText: plainText,
-      boldTexts: boldTexts,
-      plz: plz
+      plz: plzMatch ? plzMatch[1] : ''
     };
   }
 
@@ -284,14 +402,12 @@
     var $ortField = findNextFieldWithClass($suchField, CONFIG.FIELD_CLASSES.ort);
     var $strasseField = findNextFieldWithClass($suchField, CONFIG.FIELD_CLASSES.strasse);
 
-    // Pflichtfelder: suche, plz, ort
-    // Optional: strasse
+    // Pflichtfelder: suche, plz, ort – optional: strasse
     if ($plzField.length === 0 || $ortField.length === 0) {
       log('Unvollständige Feldgruppe für: ' + suchId + ' (PLZ oder Ort fehlt)', null, 'warn');
       return null;
     }
 
-    // Hinweis wenn strasse-Feld fehlt
     if ($strasseField.length === 0) {
       log('Feldgruppe ' + suchId + ': openplz-street nicht vorhanden (optional)', null, 'debug');
     }
@@ -300,16 +416,21 @@
       suche: $suchField,
       plz: $plzField,
       ort: $ortField,
-      strasse: $strasseField.length > 0 ? $strasseField : null,  // Optional!
+      strasse: $strasseField.length > 0 ? $strasseField : null,
       hasStrasseField: $strasseField.length > 0,
+      restriction: detectRestriction($suchField),
       id: suchId,
       source: null,
       isLocked: false,
       searchDisabled: false,
-      selectedStreet: null
+      selectedStreet: null,
+      debounceTimer: null,
+      requestSeq: 0
     };
 
-    log('Feldgruppe erstellt: ' + suchId + (group.hasStrasseField ? ' (mit Straßenfeld)' : ' (ohne Straßenfeld)'), null, 'success');
+    log('Feldgruppe erstellt: ' + suchId +
+        (group.hasStrasseField ? ' (mit Straßenfeld)' : ' (ohne Straßenfeld)') +
+        (group.restriction ? ' [beschränkt auf ' + group.restriction.name + ']' : ''), null, 'success');
     return group;
   }
 
@@ -326,7 +447,7 @@
     $field.after($error);
     $field.css('border-color', '#d32f2f');
 
-    log('Fehlermeldung angezeigt: ' + message, null, 'warn');
+    log('Fehlermeldung angezeigt: ' + message, null, 'debug');
   }
 
   function clearFieldError($field) {
@@ -340,14 +461,8 @@
     group.plz.prop('readonly', true);
     group.ort.prop('readonly', true);
 
-    group.plz.css({
-      'background-color': '#f5f5f5',
-      'cursor': 'not-allowed'
-    });
-    group.ort.css({
-      'background-color': '#f5f5f5',
-      'cursor': 'not-allowed'
-    });
+    group.plz.css({ 'background-color': '#f5f5f5', 'cursor': 'not-allowed' });
+    group.ort.css({ 'background-color': '#f5f5f5', 'cursor': 'not-allowed' });
 
     group.isLocked = true;
     log('PLZ/Ort Felder gesperrt für Gruppe: ' + group.id, null, 'debug');
@@ -359,14 +474,8 @@
     group.plz.prop('readonly', false);
     group.ort.prop('readonly', false);
 
-    group.plz.css({
-      'background-color': '',
-      'cursor': ''
-    });
-    group.ort.css({
-      'background-color': '',
-      'cursor': ''
-    });
+    group.plz.css({ 'background-color': '', 'cursor': '' });
+    group.ort.css({ 'background-color': '', 'cursor': '' });
 
     group.isLocked = false;
     log('PLZ/Ort Felder entsperrt für Gruppe: ' + group.id, null, 'debug');
@@ -405,50 +514,88 @@
     return true;
   }
 
+  /**
+   * Prüft bei beschränkten Gruppen, ob die (ggf. manuell eingetippte) PLZ erlaubt ist
+   */
+  function validatePLZRestriction(group) {
+    if (!group.restriction) return true;
+
+    var value = (group.plz.val() || '').trim();
+
+    if (!value || isAllowedPLZ(value, group.restriction)) {
+      clearFieldError(group.plz);
+      return true;
+    }
+
+    showFieldError(group.plz, group.restriction.hint);
+    return false;
+  }
+
   // ============================================================================
-  // BAYERN API FUNKTIONEN
+  // BAYERN ORTSSUCHDIENST (über das Plugin-Servlet)
   // ============================================================================
 
-  function searchBayernAPI(suchbegriff, callback) {
+  /**
+   * Fragt den Ortssuchdienst Bayern über den Server ab. Der API-Key ist nur dort hinterlegt.
+   * Bei HTTP 404 wird die nächste mögliche Servlet-URL probiert (Frontend-Server, andere Kontextpfade).
+   */
+  function searchBayernAPI(suchbegriff, restriction, callback) {
     if (!CONFIG.BAYERN_API.ENABLED) {
       callback(null, []);
       return;
     }
 
-    log('Bayern API Suche: ' + suchbegriff, null, 'debug');
+    log('Bayern Suche (Server): ' + suchbegriff, null, 'debug');
 
-    $.ajax({
-      url: CONFIG.BAYERN_API.BASE_URL + '/adressen/' + encodeURIComponent(suchbegriff),
-      method: 'GET',
-      dataType: 'json',
-      data: {
-        filter: 'address',
-        srid: '31468',
-        fuzzy: 'false',
-        api_key: CONFIG.BAYERN_API.API_KEY
-      },
-      timeout: 5000,
-      success: function(data) {
-        if (data && data.results && Array.isArray(data.results) && data.results.length > 0) {
-          log('Bayern API: ' + data.results.length + ' Ergebnisse', null, 'success');
-          callback(null, data.results);
-        } else {
-          callback(null, []);
+    var data = { q: suchbegriff };
+    if (restriction && restriction.cssClass) {
+      data.restriction = restriction.cssClass;
+    }
+
+    var candidates = workingServletUrl ? [workingServletUrl] : getServletUrls();
+
+    function attempt(index) {
+      $.ajax({
+        url: candidates[index],
+        method: 'GET',
+        dataType: 'json',
+        data: data,
+        cache: false,
+        timeout: 8000,
+        success: function(response) {
+          workingServletUrl = candidates[index];
+          if (response && response.ok && Array.isArray(response.results)) {
+            log('Bayern Suche: ' + response.results.length + ' Ergebnisse', null, 'success');
+            callback(null, response.results);
+          } else {
+            callback(null, []);
+          }
+        },
+        error: function(xhr, status, error) {
+          if (xhr && xhr.status === 404 && !workingServletUrl && index + 1 < candidates.length) {
+            attempt(index + 1);
+            return;
+          }
+          if (xhr && xhr.status === 503) {
+            CONFIG.BAYERN_API.ENABLED = false;
+            log('Bayern Suche im Plugin nicht konfiguriert (kein API-Key)', null, 'warn');
+          } else {
+            log('Bayern Suche Fehler: ' + (xhr && xhr.status) + ' ' + (error || status), null, 'error');
+          }
+          callback(error || status, []);
         }
-      },
-      error: function(xhr, status, error) {
-        log('Bayern API Fehler: ' + error, null, 'error');
-        callback(error, []);
-      }
-    });
+      });
+    }
+
+    attempt(0);
   }
 
   function extractBayernAddressData(result) {
-    if (!result || !result.attrs || !result.attrs.label) {
+    if (!result || !result.label) {
       return null;
     }
 
-    var parsed = parseLabel(result.attrs.label);
+    var parsed = parseLabel(result.label);
     var plain = parsed.plainText;
 
     var data = {
@@ -468,11 +615,19 @@
       }
     }
 
-    // Wende Straßennamen-Kürzung an (LBDV-Kompatibilität)
+    // Straßennamen-Kürzung (LBDV-Kompatibilität)
     data.strasse = abbreviateStreetName(data.strasse, 'bayern');
     data.vollstaendig = abbreviateStreetName(data.vollstaendig, 'bayern');
 
     return data;
+  }
+
+  function mapBayernResults(bayernResults) {
+    return (bayernResults || []).map(function(result) {
+      return extractBayernAddressData(result);
+    }).filter(function(item) {
+      return item !== null;
+    });
   }
 
   // ============================================================================
@@ -485,6 +640,11 @@
     if (streetCache[cacheKey]) {
       log('Straßen aus Cache für PLZ ' + postalCode, null, 'debug');
       callback(null, streetCache[cacheKey]);
+      return;
+    }
+
+    if (!CONFIG.OPENPLZ_API.ENABLED) {
+      callback(null, []);
       return;
     }
 
@@ -541,20 +701,60 @@
     var plz = street.postalCode || '';
     var ort = street.locality || '';
 
-    var data = {
+    return {
       strasse: strasseName,
       plz: plz,
       ort: ort,
       vollstaendig: strasseName + ' ' + plz + ' ' + ort,
       source: 'openplz'
     };
+  }
 
-    return data;
+  function mapOpenPLZStreets(streets) {
+    return (streets || []).map(function(street) {
+      return extractOpenPLZAddressData(street);
+    }).filter(function(item) {
+      return item !== null && item.strasse;
+    });
   }
 
   // ============================================================================
   // HYBRID SEARCH LOGIK
   // ============================================================================
+
+  /**
+   * Suche für beschränkte Feldgruppen (z.B. nur Kempten)
+   */
+  function restrictedSearch(suchbegriff, inputAnalysis, restriction, callback) {
+    log('→ Beschränkte Suche (' + restriction.name + ')', null, 'info');
+
+    // Fremde PLZ eingegeben → gar nicht erst suchen
+    if (inputAnalysis.plz && !isAllowedPLZ(inputAnalysis.plz, restriction)) {
+      log('PLZ ' + inputAnalysis.plz + ' liegt außerhalb von ' + restriction.name, null, 'debug');
+      callback(null, []);
+      return;
+    }
+
+    // Nur erlaubte PLZ → Straßenliste aus OpenPLZ
+    if (inputAnalysis.type === 'postalcode_only') {
+      loadStreetsForPostalCode(inputAnalysis.plz, function(error, streets) {
+        callback(null, filterByRestriction(mapOpenPLZStreets(streets), restriction));
+      });
+      return;
+    }
+
+    // Ohne PLZ/Ortsname: Ort anhängen, damit der Ortssuchdienst passende Treffer liefert
+    var query = suchbegriff;
+    if (!inputAnalysis.plz &&
+        restriction.searchSuffix &&
+        query.toLowerCase().indexOf(restriction.searchSuffix.toLowerCase()) === -1) {
+      query = query + ' ' + restriction.searchSuffix;
+    }
+
+    searchBayernAPI(query, restriction, function(error, bayernResults) {
+      callback(null, filterByRestriction(mapBayernResults(bayernResults), restriction));
+    });
+  }
 
   function hybridSearch(suchbegriff, group, callback) {
     log('Starte Hybrid-Suche für: ' + suchbegriff, null, 'info');
@@ -562,108 +762,80 @@
     var inputAnalysis = analyzeInput(suchbegriff);
     log('Eingabetyp: ' + inputAnalysis.description, null, 'debug');
 
+    if (group.restriction) {
+      restrictedSearch(suchbegriff, inputAnalysis, group.restriction, callback);
+      return;
+    }
+
     if (inputAnalysis.type === 'postalcode_only') {
       log('→ Nur PLZ erkannt: Lade Straßen von OpenPLZ', null, 'info');
+      loadStreetsForPostalCode(inputAnalysis.plz, function(error, streets) {
+        callback(null, error ? [] : mapOpenPLZStreets(streets));
+      });
+      return;
+    }
+
+    if (inputAnalysis.type === 'with_postalcode' && inputAnalysis.plz && !inputAnalysis.isBayern) {
+      log('→ Nicht-bayerische PLZ erkannt (' + inputAnalysis.plz + '): Wechsle zu OpenPLZ', null, 'info');
 
       loadStreetsForPostalCode(inputAnalysis.plz, function(error, streets) {
-        if (!error && streets && streets.length > 0) {
-          var results = streets.map(function(street) {
-            return extractOpenPLZAddressData(street);
-          }).filter(function(item) {
-            return item !== null && item.strasse;
-          });
-
-          callback(null, results);
-        } else {
+        if (error || !streets || streets.length === 0) {
           callback(null, []);
+          return;
         }
+        var searchWithoutPLZ = suchbegriff
+          .replace(/\d{5}/g, '')
+          .replace(/,/g, ' ')
+          .replace(/\s+/g, ' ')
+          .trim()
+          .toLowerCase();
+
+        var streetSearch = searchWithoutPLZ.split(' ')[0];
+
+        var filteredStreets = streets.filter(function(street) {
+          var streetName = (street.name || '').toLowerCase();
+          return streetName.indexOf(streetSearch) !== -1 ||
+                 streetSearch.indexOf(streetName.substring(0, 5)) !== -1 ||
+                 streetSearch.length < 3;
+        });
+
+        if (filteredStreets.length === 0) {
+          filteredStreets = streets;
+        }
+
+        callback(null, mapOpenPLZStreets(filteredStreets));
       });
       return;
     }
 
-    if (inputAnalysis.type === 'with_postalcode' && inputAnalysis.plz) {
+    log(inputAnalysis.plz ?
+      '→ Bayerische PLZ erkannt (' + inputAnalysis.plz + '): Suche im Ortssuchdienst Bayern' :
+      '→ Keine PLZ erkannt: Suche im Ortssuchdienst Bayern (Standard)', null, 'info');
 
-      if (!inputAnalysis.isBayern) {
-        log('→ Nicht-bayerische PLZ erkannt (' + inputAnalysis.plz + '): Wechsle zu OpenPLZ', null, 'info');
-
-        loadStreetsForPostalCode(inputAnalysis.plz, function(error, streets) {
-          if (!error && streets && streets.length > 0) {
-            var searchWithoutPLZ = suchbegriff
-              .replace(/\d{5}/g, '')
-              .replace(/,/g, ' ')
-              .replace(/\s+/g, ' ')
-              .trim()
-              .toLowerCase();
-
-            var streetSearch = searchWithoutPLZ.split(' ')[0];
-
-            var filteredStreets = streets.filter(function(street) {
-              var streetName = (street.name || '').toLowerCase();
-              return streetName.indexOf(streetSearch) !== -1 ||
-                     streetSearch.indexOf(streetName.substring(0, 5)) !== -1 ||
-                     streetSearch.length < 3;
-            });
-
-            if (filteredStreets.length === 0) {
-              filteredStreets = streets;
-            }
-
-            var results = filteredStreets.map(function(street) {
-              return extractOpenPLZAddressData(street);
-            }).filter(function(item) {
-              return item !== null && item.strasse;
-            });
-
-            callback(null, results);
-          } else {
-            callback(null, []);
-          }
-        });
-        return;
-      }
-
-      log('→ Bayerische PLZ erkannt (' + inputAnalysis.plz + '): Suche in Bayern API', null, 'info');
-      searchBayernAPI(suchbegriff, function(error, bayernResults) {
-        if (!error && bayernResults && bayernResults.length > 0) {
-          var results = bayernResults.map(function(result) {
-            return extractBayernAddressData(result);
-          }).filter(function(item) {
-            return item !== null;
-          });
-
-          callback(null, results);
-        } else {
-          callback(null, []);
-        }
-      });
-      return;
-    }
-
-    log('→ Keine PLZ erkannt: Suche in Bayern API (Standard)', null, 'info');
-
-    searchBayernAPI(suchbegriff, function(error, bayernResults) {
-      if (!error && bayernResults && bayernResults.length > 0) {
-        var results = bayernResults.map(function(result) {
-          return extractBayernAddressData(result);
-        }).filter(function(item) {
-          return item !== null;
-        });
-
-        callback(null, results);
-      } else {
-        callback(null, []);
-      }
+    searchBayernAPI(suchbegriff, null, function(error, bayernResults) {
+      callback(null, mapBayernResults(bayernResults));
     });
   }
 
   function showAutocomplete(results, $field, group) {
     $field.parent().find('.hybrid-autocomplete').remove();
 
+    var listStyle = 'position: absolute; background: white; border: 1px solid #ccc; max-height: 200px; overflow-y: auto; width: 100%; z-index: 1000; list-style: none; padding: 0; margin: 0; box-shadow: 0 2px 8px rgba(0,0,0,0.15);';
+
     if (!results || results.length === 0) {
+      // Bei beschränkten Feldern einen Hinweis statt einer leeren Liste anzeigen
+      if (group.restriction) {
+        var $hintList = $('<ul class="hybrid-autocomplete"></ul>').attr('style', listStyle);
+        var $hint = $('<li style="padding: 10px 12px; font-size: 13px; color: #666; font-style: italic; cursor: default;"></li>');
+        $hint.text('Keine Treffer. ' + group.restriction.hint);
+        $hintList.append($hint);
+        $field.parent().css('position', 'relative');
+        $field.parent().append($hintList);
+      }
       return;
     }
 
-    var $autocomplete = $('<ul class="hybrid-autocomplete" style="position: absolute; background: white; border: 1px solid #ccc; max-height: 200px; overflow-y: auto; width: 100%; z-index: 1000; list-style: none; padding: 0; margin: 0; box-shadow: 0 2px 8px rgba(0,0,0,0.15);"></ul>');
+    var $autocomplete = $('<ul class="hybrid-autocomplete"></ul>').attr('style', listStyle);
 
     results.slice(0, 10).forEach(function(result, index) {
       var displayText = result.strasse ?
@@ -672,7 +844,10 @@
 
       var sourceLabel = result.source === 'bayern' ? ' 🏔️' : ' 🇩🇪';
 
-      var $item = $('<li style="padding: 10px 12px; cursor: pointer; border-bottom: 1px solid #eee; font-size: 14px;" data-index="' + index + '">' + displayText + sourceLabel + '</li>');
+      // Text statt HTML: Treffer stammen von externen Diensten
+      var $item = $('<li style="padding: 10px 12px; cursor: pointer; border-bottom: 1px solid #eee; font-size: 14px;"></li>')
+        .attr('data-index', index)
+        .text(displayText + sourceLabel);
 
       $item.on('mouseenter', function() {
         $(this).css('background-color', '#f5f5f5');
@@ -698,7 +873,6 @@
     group.source = addressData.source;
     group.selectedStreet = addressData.strasse;
 
-    // Straßenfeld nur setzen wenn vorhanden (optional)
     if (group.hasStrasseField && group.strasse) {
       group.strasse.val(addressData.strasse);
       group.strasse.trigger('change');
@@ -721,7 +895,7 @@
 
       if (!hasHouseNumber(addressData.strasse)) {
         showFieldError(group.suche, CONFIG.VALIDATION.ERROR_MESSAGE);
-        log('Hausnummer fehlt - Validierungsfehler angezeigt', null, 'warn');
+        log('Hausnummer fehlt - Validierungsfehler angezeigt', null, 'debug');
       }
     } else {
       enableSearch(group);
@@ -744,13 +918,12 @@
     log('Initialisiere Suchfeld: ' + group.id, null, 'debug');
 
     $field.on('input', function() {
-      clearTimeout(debounceTimer);
+      clearTimeout(group.debounceTimer);
       var value = $(this).val().trim();
 
       if (group.searchDisabled && group.source === 'openplz') {
         log('Suche deaktiviert - nur Hausnummer-Ergänzung erlaubt', null, 'debug');
 
-        // Straßenfeld nur setzen wenn vorhanden (optional)
         if (group.hasStrasseField && group.strasse) {
           group.strasse.val(value);
           group.strasse.trigger('change');
@@ -768,9 +941,11 @@
         return;
       }
 
-      debounceTimer = setTimeout(function() {
+      group.debounceTimer = setTimeout(function() {
+        // Nur die Antwort der letzten Eingabe anzeigen
+        var seq = ++group.requestSeq;
         hybridSearch(value, group, function(error, results) {
-          if (!error) {
+          if (!error && seq === group.requestSeq) {
             showAutocomplete(results, $field, group);
           }
         });
@@ -806,7 +981,6 @@
         group.plz.val('');
         group.ort.val('');
 
-        // Straßenfeld nur leeren wenn vorhanden (optional)
         if (group.hasStrasseField && group.strasse) {
           group.strasse.val('');
           group.strasse.trigger('change');
@@ -816,15 +990,19 @@
         group.ort.trigger('change');
       }
     });
+
+    // Bei Ortsbeschränkung auch manuell eingetragene PLZ prüfen
+    if (group.restriction) {
+      group.plz.on('change blur', function() {
+        validatePLZRestriction(group);
+      });
+    }
   }
 
   // ============================================================================
   // MUTATION OBSERVER FÜR DYNAMISCHE ELEMENTE
   // ============================================================================
 
-  /**
-   * Initialisiert neue Suchfelder, die noch nicht initialisiert wurden
-   */
   function initializeNewFields() {
     var $suchFields = $('.' + CONFIG.FIELD_CLASSES.suche);
     var newFieldsCount = 0;
@@ -832,9 +1010,8 @@
     $suchFields.each(function() {
       var $field = $(this);
 
-      // Prüfe ob bereits initialisiert
       if ($field.data('hybrid-init')) {
-        return; // Skip
+        return;
       }
 
       var group = createFieldGroup($field);
@@ -850,9 +1027,6 @@
     }
   }
 
-  /**
-   * Startet den MutationObserver für dynamische DOM-Änderungen
-   */
   function startMutationObserver() {
     if (!CONFIG.OBSERVER.ENABLED) {
       log('MutationObserver ist deaktiviert', null, 'debug');
@@ -869,21 +1043,18 @@
 
       mutations.forEach(function(mutation) {
         if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
-          // Prüfe ob neue Knoten relevante Klassen enthalten
-          mutation.addedNodes.forEach(function(node) {
-            if (node.nodeType === Node.ELEMENT_NODE) {
-              // Prüfe ob das Element selbst oder seine Kinder Suchfelder sind
-              if ($(node).hasClass(CONFIG.FIELD_CLASSES.suche) ||
-                  $(node).find('.' + CONFIG.FIELD_CLASSES.suche).length > 0) {
-                shouldReinitialize = true;
-              }
+          for (var i = 0; i < mutation.addedNodes.length; i++) {
+            var node = mutation.addedNodes[i];
+            if (node.nodeType === Node.ELEMENT_NODE &&
+                ($(node).hasClass(CONFIG.FIELD_CLASSES.suche) ||
+                 $(node).find('.' + CONFIG.FIELD_CLASSES.suche).length > 0)) {
+              shouldReinitialize = true;
             }
-          });
+          }
         }
       });
 
       if (shouldReinitialize) {
-        // Debounce die Reinitialisierung
         clearTimeout(observerDebounceTimer);
         observerDebounceTimer = setTimeout(function() {
           log('DOM-Änderung erkannt - initialisiere neue Felder...', null, 'debug');
@@ -892,7 +1063,6 @@
       }
     });
 
-    // Beobachte das gesamte Dokument auf Änderungen
     mutationObserver.observe(document.body, {
       childList: true,
       subtree: true
@@ -901,9 +1071,6 @@
     log('MutationObserver gestartet', null, 'debug');
   }
 
-  /**
-   * Stoppt den MutationObserver
-   */
   function stopMutationObserver() {
     if (mutationObserver) {
       mutationObserver.disconnect();
@@ -916,48 +1083,39 @@
   // INITIALISIERUNG
   // ============================================================================
 
-  /**
-   * Initialisiert alle Feldgruppen
-   */
   function initialize() {
-    log('Initialisiere Hybrid Address Search v11.0 (Optionales Straßenfeld)', null, 'info');
+    if (typeof window.$ !== 'function') {
+      log('jQuery nicht gefunden – Adresssuche wird nicht gestartet', null, 'error');
+      return;
+    }
+
+    applyPluginConfig();
+    log('Initialisiere Hybrid Address Search (Plugin ' + PLUGIN_VERSION + ')', null, 'info');
 
     var $suchFields = $('.' + CONFIG.FIELD_CLASSES.suche);
 
     if ($suchFields.length === 0) {
-      log('Keine Suchfelder gefunden - warte auf dynamische Elemente...', null, 'warn');
+      log('Keine Suchfelder gefunden - warte auf dynamische Elemente...', null, 'debug');
     } else {
       log('Gefundene Suchfelder: ' + $suchFields.length, null, 'debug');
-
-      $suchFields.each(function() {
-        var group = createFieldGroup($(this));
-        if (group) {
-          fieldGroups.push(group);
-          initializeSuchField(group);
-        }
-      });
-
+      initializeNewFields();
       log('Initialisierung abgeschlossen. ' + fieldGroups.length + ' Feldgruppen aktiv', null, 'success');
     }
 
-    // Starte MutationObserver für dynamische Elemente
     startMutationObserver();
   }
 
-  /**
-   * Öffentliche Funktion zur manuellen Neuinitialisierung
-   * Kann aufgerufen werden, wenn neue Elemente dynamisch hinzugefügt wurden
-   */
   function reinitialize() {
     log('Manuelle Neuinitialisierung gestartet...', null, 'info');
     initializeNewFields();
   }
 
   // ============================================================================
-  // ÖFFENTLICHE API
+  // ÖFFENTLICHE API (kompatibel zu V12)
   // ============================================================================
 
   window.HybridAddressSearch = {
+    pluginVersion: PLUGIN_VERSION,
     initialize: initialize,
     reinitialize: reinitialize,
     initializeNewFields: initializeNewFields,
@@ -967,9 +1125,12 @@
     log: log,
     analyzeInput: analyzeInput,
     isBayernPLZ: isBayernPLZ,
+    isAllowedPLZ: isAllowedPLZ,
     hasHouseNumber: hasHouseNumber,
     validateStreetField: validateStreetField,
-    getFieldGroups: function() { return fieldGroups; }
+    validatePLZRestriction: validatePLZRestriction,
+    getFieldGroups: function() { return fieldGroups; },
+    getServletUrls: getServletUrls
   };
 
   if (document.readyState === 'loading') {

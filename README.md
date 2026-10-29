@@ -1,707 +1,99 @@
-# Hybrid Adresssuche - Bayern + OpenPLZ Integration
+# Hybride Adresssuche – formcycle-Plugin (Bayern Ortssuchdienst + OpenPLZ)
 
-![Version](https://img.shields.io/badge/version-11.0-blue.svg)
-![License](https://img.shields.io/badge/license-MIT-green.svg)
+Adress-Autovervollständigung für formcycle-Formulare:
 
-Bundesweite Adressvalidierung mit intelligenter Hybrid-Suche: **OpenPLZ** für Deutschland (bis zur Straße) und **Bayern Ortssuchdienst** für Bayern (bis zur Hausnummer).
+- **Bayern** (PLZ 80000–87999, 90000–97999): Ortssuchdienst Bayern, Validierung bis zur Hausnummer, Kürzung „Straße“ → „Str.“ (LDBV-Schreibweise)
+- **Bundesweit**: OpenPLZ API bis zur Straße, Hausnummer per RegEx geprüft
+- **Ortsbeschränkung per CSS-Klasse**, z. B. `openplz-kempten` → nur PLZ 87435, 87437, 87439
+- Wiederholbare Container (MutationObserver), optionales Straßenfeld, `window.HybridAddressSearch` wie bisher
 
-## 🎯 Features
+Seit Version 1.0.0 ist die Adresssuche ein formcycle-Plugin. Das frühere Skript (`hybrid-address-search.js` V12) enthielt den API-Key des Ortssuchdienstes im Quelltext und damit in jedem Browser. **Im Plugin bleibt der Key auf dem Server:** Der Browser fragt das Plugin-Servlet, das den Ortssuchdienst mit dem hinterlegten Key aufruft und nur die Adress-Labels zurückgibt.
 
-### ✨ Version 11.0 - Optionales Straßenfeld
-- **Flexibles Formular-Layout**: Das `openplz-street` Feld ist jetzt optional
-- Unterstützt Formulare mit nur 3 Feldern (Suche, PLZ, Ort)
-- Abwärtskompatibel mit Formularen, die 4 Felder nutzen
+## Voraussetzungen
 
-### Demo
-- Die Demo ist gegenwärtig unter https://formulare.kempten.de/frontend-server/form/alias/1/form_14352 ereichbar.
+- formcycle ab 8.5.0, Installation als **Mandanten-Plugin**
+- API-Key für den Ortssuchdienst Bayern (geoservices.bayern.de); ohne Key läuft nur die OpenPLZ-Suche
 
-### 🆕 Frühere Versionen
-- **V10**: Automatische Kürzung von "Straße" zu "Str." (LDBV-Kompatibilität für Bayern)
-- **V9**: MutationObserver für dynamisch hinzugefügte Elemente (wiederholbare Container)
-- **V9**: Automatische Erkennung neuer Suchfelder im DOM
-- **V9**: `reinitialize()` Funktion für manuelle Neuinitialisierung
+## Installation (Ablösung des bisherigen Skripts)
 
-### 🏔️ Bayern Ortssuchdienst
-- Validierung bis zur **Hausnummer** für Bayern (PLZ 80000-87999, 90000-97999)
-- Direkte Anbindung an offizielle Geoservices Bayern API
-- Automatische Straßennamen-Kürzung nach LBDV-Standard
+1. `dist/fc-plugin-adresssuche-1.0.1.jar` unter *Mandant › Plugins* hochladen.
+2. In den Plugin-Einstellungen den **Bayern API-Key** eintragen (Feld wird maskiert gespeichert).
+3. In jedem Formular, das die Adresssuche nutzt, unter *Dateien/Ressourcen* die alte JS-Datei (bzw. den eingefügten Skript-Code) **entfernen** und die Plugin-Ressource **`hybrid-address-search.js`** einbinden.
+4. Formulare speichern. Feldklassen und Container-Klassen bleiben unverändert, es ist keine weitere Anpassung nötig.
+5. Den bisher veröffentlichten API-Key beim Ortssuchdienst Bayern **sperren und neu ausstellen** lassen und nur den neuen Key im Plugin hinterlegen. Der alte Key war über die Formularseiten öffentlich abrufbar.
 
-### 🇩🇪 OpenPLZ API
-- Bundesweite Straßenverzeichnisse
-- Hausnummer-Validierung via RegEx
-- Fehlermeldung bei fehlender Hausnummer
+Ist die alte Datei noch im Formular, startet die Plugin-Version nicht zusätzlich und meldet in der Browser-Konsole, dass das alte Skript entfernt werden muss.
 
-### 🚀 Intelligente Hybrid-Logik
-- **Automatische API-Wahl** basierend auf PLZ-Erkennung
-- **PLZ-basierte Filterung**: Bei Eingabe nicht-bayerischer PLZ → OpenPLZ
-- **Fallback-Mechanismus**: Keine Ergebnisse → Alternative API
-- **Smart-Caching**: Straßen werden pro PLZ gecacht
+## Formularaufbau (unverändert)
 
-### 🎨 Benutzerfreundlichkeit
-- Echtzeit-Autocomplete mit Debouncing (300ms)
-- Visuelle Quellenanzeige (🏔️ Bayern / 🇩🇪 OpenPLZ)
-- Feldvalidierung mit inline Fehlermeldungen
-- Automatisches Sperren ausgefüllter PLZ/Ort-Felder
-- ESC-Taste schließt Autocomplete
+| CSS-Klasse | Feld | Pflicht |
+|---|---|---|
+| `openplz-suche` | Suchfeld (Straße + Hausnummer) | ja |
+| `openplz-postalcode` | PLZ | ja |
+| `openplz-locality` | Ort | ja |
+| `openplz-street` | Straße (separat) | nein |
 
-### 🔄 Dynamische Formulare
-- **MutationObserver**: Erkennt automatisch neue Felder im DOM
-- Ideal für wiederholbare Container und AJAX-Formulare
-- Manuelle Reinitialisierung möglich: `HybridAddressSearch.reinitialize()`
+### Ortsbeschränkung
 
----
+Die Klasse der Beschränkung (z. B. `openplz-kempten`) an das Suchfeld **oder** an einen umgebenden Container hängen. Dann
 
-## 📋 Voraussetzungen
+- liefert die Suche nur Adressen mit erlaubter PLZ (zusätzlich serverseitig gefiltert),
+- wird bei Suchen ohne PLZ/Ort der Suchzusatz (z. B. „Kempten“) angehängt,
+- wird eine manuell eingetragene fremde PLZ als Fehler markiert.
 
-- **jQuery** (getestet mit v3.x)
-- Modernes Browser mit ES5-Support
-- Optional: Bayern API-Key (für Bayern-Suche)
+## Plugin-Einstellungen
 
----
+| Einstellung | Standard | Bedeutung |
+|---|---|---|
+| `de.hybridadresssuche.fc.bayernApiKey` | – | API-Key Ortssuchdienst Bayern (maskiert, bleibt auf dem Server) |
+| `de.hybridadresssuche.fc.restrictions` | `openplz-kempten=Kempten (Allgäu)\|Kempten\|87435,87437,87439` | Ortsbeschränkungen: `css-klasse=Name\|Suchzusatz\|PLZ,PLZ`, mehrere mit `;` trennen, `-` = keine |
+| `de.hybridadresssuche.fc.rateLimitPerMinute` | `120` | Suchanfragen pro Minute und Besucher (10–10000) |
+| `de.hybridadresssuche.fc.globalRateLimitPerMinute` | `3000` | Suchanfragen pro Minute für alle Besucher zusammen (100–100000), schützt das Kontingent des API-Keys |
+| `de.hybridadresssuche.fc.debug` | `false` | Ausführliche Ausgaben in der Browser-Konsole |
 
-## 🚀 Installation
+Nach Änderungen das Plugin deaktivieren und wieder aktivieren, damit die Werte übernommen werden.
 
-### Standard-Installation
+## Aufbau des Plugins
 
-#### 1. Datei einbinden
+| Klasse | Typ | Aufgabe |
+|---|---|---|
+| `AdresssucheServletPlugin` | `IPluginServletAction` (`plugin?name=hybridAdresssuche`) | Proxy zum Ortssuchdienst: Eingabeprüfung, Anfragelimit pro Besucher und global, Cache (10 min), Ortsfilter, Antwort nur `{label}` |
+| `AdresssucheResourcePlugin` | `IPluginFormResource` | Formular-Ressource `hybrid-address-search.js` (ES5, ohne Key) |
+| `AdresssuchePreRenderPlugin` | `IPluginFormPreRender` | Servlet-URL (inkl. `client-id`), Ortsbeschränkungen, Debug-Schalter für den Browser |
+| `AdresssucheBundleProperties` | `IBundleProperties` | Plugin-Einstellungen |
 
-```html
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-<script src="hybrid-address-search.js"></script>
-```
+Servlet-Antwort:
 
-### XIMA Formcycle Integration
-
-Für die Integration in **XIMA Formcycle**:
-
-#### 1. Datei hochladen
-
-1. Im XIMA Formcycle Backend zu **"Mandant" → "Mandantdateien"** navigieren
-2. `hybrid-address-search.js` hochladen
-3. Datei wird automatisch allen Formularen des Mandanten zur Verfügung gestellt
-
-#### 2. Script einbinden
-
-Im Formular unter **"Formulareigenschaften" → "Erweitert" → "Zusätzliches JavaScript"**:
-
-```javascript
-// jQuery ist in Formcycle bereits vorhanden
-// Script wird automatisch aus Mandantdateien geladen
-```
-
-Oder manuell in einem HTML-Element:
-
-```html
-<script src="${baseurl}/mandant/[MANDANT-ID]/files/hybrid-address-search.js"></script>
-```
-
-#### 3. Felder mit CSS-Klassen versehen
-
-In Formcycle die Input-Felder mit den entsprechenden Klassen ausstatten:
-
-- **Suchfeld**: `openplz-suche`
-- **PLZ-Feld**: `openplz-postalcode`
-- **Ort-Feld**: `openplz-locality`
-- **Straßenfeld** (optional): `openplz-street`
-
-**CSS-Klassen hinzufügen**: In den Feldeigenschaften unter "CSS-Klasse (class)"
-
-#### 4. Wiederholbare Container
-
-Das Script funktioniert automatisch mit **wiederholbaren Containern** in Formcycle!
-
-```
-📁 Adresse (wiederholt)
-  ├─ Suchfeld (openplz-suche)
-  ├─ Straße (openplz-street)
-  ├─ PLZ (openplz-postalcode)
-  └─ Ort (openplz-locality)
-```
-
-Der **MutationObserver** erkennt automatisch neue Container und initialisiert die Felder.
-
-**Weitere Informationen**: [XIMA Formcycle Mandantendateien](https://help8.formcycle.eu/de/support/solutions/articles/103000046891-mandantdateien)
-
-### 2. Bayern API-Key konfigurieren
-
-Öffne `hybrid-address-search.js` und trage deinen API-Key ein:
-
-```javascript
-var CONFIG = {
-  BAYERN_API: {
-    BASE_URL: 'https://geoservices.bayern.de/services/ortssuche/v1',
-    API_KEY: 'DEIN_API_KEY_HIER',  // ← API-Key eintragen
-    ENABLED: true
-  },
-  // ...
-};
-```
-
-#### Bayern API-Key beantragen (kostenlos!)
-
-Die Nutzung der Bayern Geoservices API ist **kostenlos**:
-
-1. **Website besuchen**: [https://geodatenonline.bayern.de/geodatenonline/](https://geodatenonline.bayern.de/geodatenonline/)
-2. **Registrierung**: Kostenlosen Account anlegen
-3. **API-Key anfordern**: Im Portal unter "Meine APIs" → "Neuen API-Key erstellen"
-4. **Freischaltung**: Key wird in der Regel innerhalb von 1-2 Werktagen freigeschaltet
-5. **E-Mail-Bestätigung**: API-Key wird per E-Mail zugesendet
-
-**Wichtig**: Bei der Anfrage angeben, dass der Key für die Ortssuchdienst-API benötigt wird.
-
-**Alternative ohne Bayern-API**: Wenn kein API-Key verfügbar ist, kann die Bayern-API deaktiviert werden:
-```javascript
-BAYERN_API: {
-  ENABLED: false  // Nur OpenPLZ nutzen
-}
-```
-
----
-
-## 📝 HTML-Markup
-
-### Option A: Formular mit 4 Feldern (klassisch)
-
-```html
-<div>
-  <label>Adresssuche</label>
-  <input type="text"
-         class="openplz-suche"
-         placeholder="Straße oder PLZ eingeben">
-</div>
-
-<div>
-  <label>Straße</label>
-  <input type="text"
-         class="openplz-street"
-         placeholder="Straße + Hausnummer">
-</div>
-
-<div>
-  <label>PLZ</label>
-  <input type="text"
-         class="openplz-postalcode"
-         placeholder="PLZ">
-</div>
-
-<div>
-  <label>Ort</label>
-  <input type="text"
-         class="openplz-locality"
-         placeholder="Ort">
-</div>
-```
-
-### Option B: Formular mit 3 Feldern (ohne separates Straßenfeld)
-
-```html
-<div>
-  <label>Adresssuche</label>
-  <input type="text"
-         class="openplz-suche"
-         placeholder="Straße oder PLZ eingeben">
-</div>
-
-<div>
-  <label>PLZ</label>
-  <input type="text"
-         class="openplz-postalcode"
-         placeholder="PLZ">
-</div>
-
-<div>
-  <label>Ort</label>
-  <input type="text"
-         class="openplz-locality"
-         placeholder="Ort">
-</div>
-```
-
-**Wichtig:**
-- `openplz-suche` (Pflicht)
-- `openplz-postalcode` (Pflicht)
-- `openplz-locality` (Pflicht)
-- `openplz-street` (Optional seit V11)
-
----
-
-## ⚙️ Konfiguration
-
-Alle Einstellungen befinden sich im `CONFIG`-Objekt:
-
-### API-Konfiguration
-
-```javascript
-BAYERN_API: {
-  BASE_URL: 'https://geoservices.bayern.de/services/ortssuche/v1',
-  API_KEY: 'DEIN_API_KEY',
-  ENABLED: true  // Bayern API aktivieren/deaktivieren
-},
-
-OPENPLZ_API: {
-  BASE_URL: 'https://openplzapi.org/de',
-  ENABLED: true  // OpenPLZ API aktivieren/deaktivieren
-}
-```
-
-### Feldklassen anpassen
-
-```javascript
-FIELD_CLASSES: {
-  suche: 'openplz-suche',      // Suchfeld
-  plz: 'openplz-postalcode',   // PLZ-Feld
-  ort: 'openplz-locality',     // Ort-Feld
-  strasse: 'openplz-street'    // Straßenfeld (optional)
-}
-```
-
-### Bayern PLZ-Bereiche
-
-```javascript
-BAYERN_PLZ_RANGES: [
-  { min: 80000, max: 87999 },  // München-Region
-  { min: 90000, max: 97999 }   // Franken-Region
-]
-```
-
-### Straßennamen-Kürzung (LDBV)
-
-```javascript
-STREET_ABBREVIATION: {
-  ENABLED: true,              // Kürzung aktivieren
-  APPLY_TO_BAYERN: true,      // Nur bei Bayern-Adressen
-  APPLY_TO_OPENPLZ: false,    // Bei OpenPLZ-Adressen
-  RULES: [
-    { pattern: /straße(\s|$)/gi, replacement: 'str.$1' },
-    { pattern: /Straße(\s|$)/g,  replacement: 'Str.$1' },
-    { pattern: /STRASSE(\s|$)/g, replacement: 'STR.$1' }
-  ]
-}
-```
-
-**Beispiel:**
-- Input: `Herrenstraße 7, 80539 München`
-- Output: `Herrenstr. 7, 80539 München`
-
-### Performance-Einstellungen
-
-```javascript
-DEBOUNCE_DELAY: 300,          // Verzögerung Autocomplete (ms)
-AUTOCOMPLETE_MIN_LENGTH: 3,   // Min. Zeichen für Suche
-PAGE_SIZE: 50,                // Ergebnisse pro Seite (OpenPLZ)
-MAX_PAGES: 20,                // Max. Seiten (OpenPLZ)
-
-OBSERVER: {
-  ENABLED: true,              // MutationObserver aktivieren
-  DEBOUNCE_DELAY: 100         // Verzögerung DOM-Änderung (ms)
-}
-```
-
-### Debug-Modus
-
-```javascript
-DEBUG: true  // Konsolenausgaben aktivieren
-```
-
----
-
-## 🎮 Verwendung
-
-### Automatische Initialisierung
-
-Das Script initialisiert sich automatisch beim Laden:
-
-```javascript
-// Wird automatisch ausgeführt
-document.addEventListener('DOMContentLoaded', initialize);
-```
-
-### Manuelle Neuinitialisierung
-
-Nach dynamischem Hinzufügen von Feldern:
-
-```javascript
-// Neue Felder wurden per AJAX geladen
-HybridAddressSearch.reinitialize();
-```
-
-### MutationObserver
-
-Seit V9 werden neue Felder **automatisch erkannt**:
-
-```javascript
-// Observer starten (läuft standardmäßig)
-HybridAddressSearch.startObserver();
-
-// Observer stoppen
-HybridAddressSearch.stopObserver();
-```
-
-### API-Funktionen
-
-```javascript
-// Alle Feldgruppen abrufen
-var groups = HybridAddressSearch.getFieldGroups();
-
-// Eingabe analysieren
-var analysis = HybridAddressSearch.analyzeInput('Marienplatz 1 80331');
-// → { type: 'with_postalcode', plz: '80331', isBayern: true, ... }
-
-// PLZ-Prüfung
-var isBayern = HybridAddressSearch.isBayernPLZ('80331');  // → true
-var isNot = HybridAddressSearch.isBayernPLZ('10115');     // → false
-
-// Hausnummer-Validierung
-var valid = HybridAddressSearch.hasHouseNumber('Hauptstr. 12a');  // → true
-var invalid = HybridAddressSearch.hasHouseNumber('Hauptstraße');  // → false
-```
-
----
-
-## 🔍 Suchmodi
-
-### 1. Nur PLZ
-```
-Eingabe: "80331"
-Verhalten: Lädt alle Straßen für PLZ 80331 via Bayern API
-```
-
-### 2. PLZ + Straße (Bayern)
-```
-Eingabe: "Marienplatz 80331" oder "80331 Marienplatz"
-Verhalten: Bayern API → Ergebnisse bis Hausnummer
-Anzeige: 🏔️ Marienplatz 1 80331 München
-```
-
-### 3. PLZ + Straße (nicht Bayern)
-```
-Eingabe: "Unter den Linden 10117"
-Verhalten: OpenPLZ API → Ergebnisse bis Straßenname
-Anzeige: 🇩🇪 Unter den Linden 10117 Berlin
-Hinweis: Hausnummer manuell ergänzen
-```
-
-### 4. Nur Straßenname
-```
-Eingabe: "Hauptstraße"
-Verhalten: Bayern API (Standard-Fallback)
-```
-
----
-
-## ✅ Validierung
-
-### Bayern-Adressen (🏔️)
-- **Keine Validierung**: Hausnummer bereits in API-Daten vorhanden
-- Felder PLZ/Ort werden gesperrt
-- Suche bleibt aktiv für Änderungen
-
-### OpenPLZ-Adressen (🇩🇪)
-- **Hausnummer-Pflicht**: RegEx-Validierung
-- Fehlermeldung wenn Hausnummer fehlt
-- Suche deaktiviert (nur Hausnummer ergänzen)
-
-```javascript
-// Validierungsregel
-STREET_WITH_NUMBER_REGEX: /^(([a-zA-ZäöüÄÖÜß]\D*)\s+\d+?\s*.*)$/
-
-// Gültige Formate:
-✓ "Hauptstr. 42"
-✓ "Am Plan 3c"
-✓ "A-Weg 8"
-✓ "Berliner Straße 12 1/2"
-
-// Ungültige Formate:
-✗ "Hauptstraße"
-✗ "Berliner Str"
-```
-
----
-
-## 🎨 Styling
-
-### Autocomplete-Liste
-
-Das Autocomplete wird dynamisch generiert. Standard-Styles:
-
-```css
-.hybrid-autocomplete {
-  position: absolute;
-  background: white;
-  border: 1px solid #ccc;
-  max-height: 200px;
-  overflow-y: auto;
-  width: 100%;
-  z-index: 1000;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-}
-
-.hybrid-autocomplete li {
-  padding: 10px 12px;
-  cursor: pointer;
-  border-bottom: 1px solid #eee;
-}
-
-.hybrid-autocomplete li:hover {
-  background-color: #f5f5f5;
-}
-```
-
-### Fehlermeldungen
-
-```css
-.hybrid-field-error {
-  color: #d32f2f;
-  font-size: 12px;
-  margin-top: 4px;
-  padding: 4px 8px;
-  background: #ffebee;
-  border-radius: 4px;
-  border-left: 3px solid #d32f2f;
-}
-```
-
-### Gesperrte Felder
-
-```css
-input[readonly].locked {
-  background-color: #f5f5f5;
-  cursor: not-allowed;
-}
-```
-
----
-
-## 🔧 Erweiterte Beispiele
-
-### Wiederholbare Container (XIMA Formcycle)
-
-```html
-<!-- Container 1 -->
-<div id="address_c_1">
-  <input class="openplz-suche" id="search_1">
-  <input class="openplz-postalcode" id="plz_1">
-  <input class="openplz-locality" id="ort_1">
-  <input class="openplz-street" id="street_1">
-</div>
-
-<!-- Container 2 (wird dynamisch hinzugefügt) -->
-<div id="address_c_2">
-  <input class="openplz-suche" id="search_2">
-  <input class="openplz-postalcode" id="plz_2">
-  <input class="openplz-locality" id="ort_2">
-  <input class="openplz-street" id="street_2">
-</div>
-```
-
-**Automatische Erkennung durch MutationObserver!**
-
-### Manuelles Triggern bei AJAX
-
-```javascript
-// Nach AJAX-Laden von Formularfeldern
-$.ajax({
-  url: '/load-form',
-  success: function(html) {
-    $('#form-container').html(html);
-
-    // Optional: Manuelle Reinitialisierung
-    HybridAddressSearch.reinitialize();
-  }
-});
-```
-
-### Custom Event Handling
-
-```javascript
-// Eigene Logik bei Adressauswahl
-$(document).on('change', '.openplz-postalcode', function() {
-  var plz = $(this).val();
-  console.log('PLZ wurde gesetzt:', plz);
-
-  // Eigene Validierung, API-Calls, etc.
-});
-```
-
----
-
-## 🐛 Debugging
-
-### Console Logs
-
-Bei `DEBUG: true` werden folgende Logs ausgegeben:
-
-```
-✓ [HybridSearch] Initialisiere Hybrid Address Search v11.0
-🔍 [HybridSearch] Erstelle Feldgruppe für: search_1
-✅ [HybridSearch] Feldgruppe erstellt: search_1 (mit Straßenfeld)
-🔍 [HybridSearch] Starte Hybrid-Suche für: Marienplatz 80331
-✅ [HybridSearch] Bayern API: 15 Ergebnisse
-✅ [HybridSearch] Wähle Adresse: Marienplatz 1 80331 München (Quelle: bayern)
-```
-
-### Feldgruppen inspizieren
-
-```javascript
-// Alle aktiven Feldgruppen
-var groups = HybridAddressSearch.getFieldGroups();
-console.table(groups);
-
-// Einzelne Gruppe
-var group = groups[0];
-console.log('Quelle:', group.source);        // 'bayern' oder 'openplz'
-console.log('Gesperrt:', group.isLocked);    // true/false
-console.log('Hat Straßenfeld:', group.hasStrasseField);  // true/false
-```
-
-### Häufige Probleme
-
-#### Autocomplete erscheint nicht
-- jQuery geladen?
-- CSS `position: relative` auf Parent-Element?
-- Min. 3 Zeichen eingegeben?
-- Debug-Logs prüfen
-
-#### Felder werden nicht erkannt
-- Klassen korrekt? (`openplz-suche`, `openplz-postalcode`, `openplz-locality`)
-- MutationObserver aktiviert? (`CONFIG.OBSERVER.ENABLED = true`)
-- Manuelle Reinitialisierung: `HybridAddressSearch.reinitialize()`
-
-#### Bayern API gibt keine Ergebnisse
-- API-Key korrekt eingetragen?
-- PLZ im Bayern-Bereich? (80000-87999, 90000-97999)
-- Netzwerk-Tab prüfen (403 = Key falsch, 404 = keine Treffer)
-
-#### XIMA Formcycle spezifisch
-- **Mandantdatei nicht gefunden**: Pfad prüfen `${baseurl}/mandant/[MANDANT-ID]/files/hybrid-address-search.js`
-- **Felder werden nicht initialisiert**: Sicherstellen dass jQuery VOR dem Script geladen wird
-- **Wiederholbare Container**: MutationObserver sollte aktiviert sein (`CONFIG.OBSERVER.ENABLED = true`)
-- **Feldklassen nicht erkannt**: CSS-Klassen direkt in Feldeinstellungen eintragen (nicht im HTML)
-- **Script Fehler**: Browser-Konsole öffnen (F12) und nach JavaScript-Fehlern suchen
-
-**Formcycle Debug-Modus**:
-```javascript
-// Im Browser-Konsole ausführen:
-HybridAddressSearch.config.DEBUG = true;
-HybridAddressSearch.getFieldGroups();  // Zeigt alle erkannten Feldgruppen
-```
-
----
-
-## 📊 API-Übersicht
-
-### Bayern Geoservices API
-
-**Endpoint:**
-```
-GET https://geoservices.bayern.de/services/ortssuche/v1/adressen/{suchbegriff}
-```
-
-**Parameter:**
-- `filter`: `address`
-- `srid`: `31468`
-- `fuzzy`: `false`
-- `api_key`: Dein API-Key
-
-**Response:**
 ```json
-{
-  "results": [
-    {
-      "attrs": {
-        "label": "<b>Marienplatz 1</b> 80331 München"
-      }
-    }
-  ]
-}
+{"ok": true, "results": [{"label": "Rathausplatz 29 87435 Kempten (Allgäu)"}]}
 ```
 
-### OpenPLZ API
+Fehler: `400 invalid_query | unknown_restriction`, `429 rate_limited`, `502 upstream_error`, `503 not_configured`.
 
-**Endpoint:**
-```
-GET https://openplzapi.org/de/Streets
-```
+OpenPLZ (Straßenverzeichnisse) wird wie bisher direkt aus dem Browser abgefragt; dafür ist kein Key nötig.
 
-**Parameter:**
-- `postalCode`: PLZ
-- `page`: Seitennummer
-- `pageSize`: Ergebnisse pro Seite
+## Entwicklung
 
-**Response:**
-```json
-[
-  {
-    "name": "Unter den Linden",
-    "postalCode": "10117",
-    "locality": "Berlin"
-  }
-]
+```bash
+mvn clean package      # Tests + Fat-JAR in target/
+mvn -Dxfc.version=8.5.0 clean test   # gegen die Mindestversion prüfen
 ```
 
----
+Java 11 (Release-Level), formcycle-APIs als `provided`. Details für die Weiterentwicklung: [CLAUDE.md](CLAUDE.md).
 
-## 🗺️ PLZ-Bereiche Deutschland
+## Sicherheit
 
-| Region | PLZ-Bereich | API |
-|--------|-------------|-----|
-| **Bayern (München)** | 80000-87999 | 🏔️ Bayern |
-| **Bayern (Franken)** | 90000-97999 | 🏔️ Bayern |
-| Alle anderen | 00000-79999, 88000-89999, 98000-99999 | 🇩🇪 OpenPLZ |
+Sicherheitstests (Unit-Tests `AdresssucheSecurityTest` und Live-Tests gegen eine formcycle-Installation): [docs/SECURITY_REPORT.md](docs/SECURITY_REPORT.md).
 
----
+## Änderungen
 
-## 📄 Lizenz
+- **1.0.1:** Neutrale technische Namen (Servlet `hybridAdresssuche`, Ressource `hybridAdresssucheResource`, Einstellungen `de.hybridadresssuche.fc.*`). Beim Wechsel von 1.0.0 den API-Key neu eintragen und die Ressource `hybrid-address-search.js` in den Formularen neu auswählen. Globale Obergrenze für Suchanfragen (Schutz des API-Kontingents, auch bei ständig neuen Sessions), Sicherheitstests.
+- **1.0.0:** Erste Plugin-Version, API-Key nur noch serverseitig; Nachfolger von hybrid-address-search.js V12.
 
-MIT License - Frei verwendbar für private und kommerzielle Projekte.
+## Datenschutz
 
----
+Suchbegriffe gehen über den formcycle-Server an den Ortssuchdienst Bayern (Landesamt für Digitalisierung, Breitband und Vermessung); die IP-Adresse der Besucher wird dabei nicht weitergegeben. Straßenlisten lädt der Browser direkt von openplzapi.org. Suchbegriffe werden vom Plugin nicht protokolliert.
 
-## 🤝 Support
+## Lizenz
 
-Bei Fragen oder Problemen:
-1. Debug-Modus aktivieren (`DEBUG: true`)
-2. Browser-Konsole prüfen
-3. Netzwerk-Tab öffnen (API-Aufrufe)
-
----
-
-## 📌 Changelog
-
-### v11.0 (2025)
-- ✨ Straßenfeld (`openplz-street`) ist jetzt optional
-- 🔧 Unterstützung für 3-Felder-Formulare (Suche, PLZ, Ort)
-- 📝 Verbesserte Dokumentation
-
-### v10.0 (2025)
-- ✨ Automatische Straßennamen-Kürzung (LBDV-Kompatibilität)
-- 🔧 Konfigurierbare Kürzungsregeln
-
-### v9.0 (2025)
-- ✨ MutationObserver für dynamische Elemente
-- ✨ `reinitialize()` Funktion
-- ✨ Automatische Erkennung neuer Suchfelder
-- 🐛 Bugfixes für wiederholbare Container
-
-### v8.0 und früher
-- Hybrid-Suche mit Bayern + OpenPLZ
-- Autocomplete-Funktionalität
-- Validierung mit RegEx
-- Caching-Mechanismus
-
----
-
-## 🎯 Roadmap
-
-- [x] **TypeScript-Version** ✅ (siehe `EXPERIMENTAL-FEATURES.md`)
-- [x] **Nominatim API-Integration** ✅ (siehe `EXPERIMENTAL-FEATURES.md`)
-- [x] **Erweiterte Validierung** ✅ (siehe `EXPERIMENTAL-FEATURES.md`)
-- [ ] React/Vue/Angular-Komponenten
-- [ ] Offline-Modus mit IndexedDB
-- [ ] Automatische Tests (Unit/Integration)
-
-**Experimentelle Features verfügbar!** Siehe [EXPERIMENTAL-FEATURES.md](EXPERIMENTAL-FEATURES.md) für Details.
-
----
-
-**Entwickelt für XIMA Formcycle und andere Formular-Frameworks**
+MIT, siehe [LICENSE](LICENSE).
